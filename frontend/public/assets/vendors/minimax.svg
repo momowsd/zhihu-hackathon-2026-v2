@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="MiniMax">
+  <defs>
+    <linearGradient id="minimax-brand-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5EEAD4" />
+      <stop offset="100%" stop-color="#0F766E" />
+    </linearGradient>
+  </defs>
+  <rect width="24" height="24" rx="6" fill="url(#minimax-brand-grad)" />
+  <path fill="#fff" d="M7 17V7h2.2l3.1 6.3 3.1-6.3H17v10h-2v-6.2L12 17l-3-6.2V17H7Z" />
+</svg>

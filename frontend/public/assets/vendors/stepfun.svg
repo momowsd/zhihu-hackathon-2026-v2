@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="StepFun">
+  <defs>
+    <linearGradient id="stepfun-brand-grad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FB923C" />
+      <stop offset="100%" stop-color="#EA580C" />
+    </linearGradient>
+  </defs>
+  <rect width="24" height="24" rx="5" fill="#fff7ed" />
+  <path
+    fill="url(#stepfun-brand-grad)"
+    d="M5 17V7h3.5l3.5 5.5V7H16v10h-3.5v-5l-3.5 5H5Zm11 0V7h5v2.5h-2.5V17h-2.5Z"
+  />
+</svg>

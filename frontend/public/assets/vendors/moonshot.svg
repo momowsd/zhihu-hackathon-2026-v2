@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="Moonshot">
+  <defs>
+    <linearGradient id="moonshot-brand-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#C084FC" />
+      <stop offset="100%" stop-color="#DB2777" />
+    </linearGradient>
+  </defs>
+  <circle cx="12" cy="12" r="10" fill="#1e1033" />
+  <path
+    fill="url(#moonshot-brand-grad)"
+    d="M18 14.5a6.5 6.5 0 1 1-6.5-11 7 7 0 0 0 3.2 8.2 6.4 6.4 0 0 0 3.3 2.8Z"
+  />
+  <circle cx="9" cy="11" r="1.2" fill="#FDE68A" />
+</svg>

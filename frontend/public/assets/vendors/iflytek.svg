@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="iFlytek">
+  <defs>
+    <linearGradient id="iflytek-wave-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0EA5E9" />
+      <stop offset="100%" stop-color="#0369A1" />
+    </linearGradient>
+  </defs>
+  <rect width="24" height="24" rx="6" fill="#e0f2fe" />
+  <path
+    fill="none"
+    stroke="url(#iflytek-wave-grad)"
+    stroke-width="2.2"
+    stroke-linecap="round"
+    d="M5 14c2.2-3.8 4.5-6 7-6s4.8 2.2 7 6"
+  />
+  <path fill="#0369a1" d="M9 15.5h6v1.8H9zm1-4h4v1.4h-4z" />
+</svg>

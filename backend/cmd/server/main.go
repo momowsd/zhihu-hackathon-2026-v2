@@ -132,9 +132,12 @@ type EvalSession struct {
 	CategoryID     string     `gorm:"index;size:36;not null" json:"categoryId"`
 	Mode           string     `gorm:"size:32;not null" json:"mode"`
 	Status         string     `gorm:"size:32;not null" json:"status"`
-	RequestedCount int        `gorm:"not null" json:"requestedCount"`
-	CreatedAt      time.Time  `gorm:"not null" json:"createdAt"`
-	CompletedAt    *time.Time `json:"completedAt,omitempty"`
+	// RequestedCount 本局实际生成的小题数量（eval_items 条数）
+	RequestedCount int `gorm:"not null" json:"requestedCount"`
+	// DesiredCount 用户希望的本局题数；若该主题下可组 1v1 的题不足，实际会小于 DesiredCount
+	DesiredCount  int        `gorm:"not null;default:0" json:"desiredCount"`
+	CreatedAt     time.Time  `gorm:"not null" json:"createdAt"`
+	CompletedAt   *time.Time `json:"completedAt,omitempty"`
 }
 
 func (EvalSession) TableName() string { return "eval_sessions" }
@@ -260,10 +263,34 @@ func migrateAndSeed(db *gorm.DB) error {
 		return err
 	}
 	questionsByCat := map[string][]string{
-		cats[0].ID: {"如果一只猫每小时吃 2 条鱼，为什么它三小时后还说自己饿？", "请解释为什么 1+1 在某些语境下不一定等于 2。", "一个人把伞带进室内却没有淋湿，最可能发生了什么？"},
-		cats[1].ID: {"用不伤人的方式总结一场办公室八卦。", "请写一段明星塌房传闻的理性吃瓜评论。", "如何判断一条社交平台爆料是否值得相信？"},
-		cats[2].ID: {"你是赛博酒馆老板，请劝一位机器人诗人别赊账。", "扮演古代谋士，帮我说服老板批准一天假。", "你是一只会写代码的橘猫，解释什么是缓存。"},
-		cats[3].ID: {"写一个关于程序员和咖啡的短笑话。", "把数据库索引讲成脱口秀段子。", "用一句话吐槽模型评测排行榜。"},
+		cats[0].ID: {
+			"如果一只猫每小时吃 2 条鱼，为什么它三小时后还说自己饿？",
+			"请解释为什么 1+1 在某些语境下不一定等于 2。",
+			"一个人把伞带进室内却没有淋湿，最可能发生了什么？",
+			"为什么说「明天一定早睡」是最常见的谎言之一？",
+			"如果重力突然减半一天，最先倒霉的是哪种职业？",
+		},
+		cats[1].ID: {
+			"用不伤人的方式总结一场办公室八卦。",
+			"请写一段明星塌房传闻的理性吃瓜评论。",
+			"如何判断一条社交平台爆料是否值得相信？",
+			"怎样礼貌地退出一段令人尴尬的群聊话题？",
+			"朋友问你「我是不是胖了」，怎样回答既不伤人又不说假话？",
+		},
+		cats[2].ID: {
+			"你是赛博酒馆老板，请劝一位机器人诗人别赊账。",
+			"扮演古代谋士，帮我说服老板批准一天假。",
+			"你是一只会写代码的橘猫，解释什么是缓存。",
+			"扮演星际飞船 AI，用三条守则约束乘客使用微波炉。",
+			"你是反派手下的尽职 HR，写一则招募英雄的虚假招聘启事。",
+		},
+		cats[3].ID: {
+			"写一个关于程序员和咖啡的短笑话。",
+			"把数据库索引讲成脱口秀段子。",
+			"用一句话吐槽模型评测排行榜。",
+			"讲一个关于「需求又改了」的冷笑话。",
+			"用谐音梗解释 GPU 和 CPU 的区别（要能逗笑外行）。",
+		},
 	}
 	for _, cat := range cats {
 		for _, prompt := range questionsByCat[cat.ID] {
@@ -305,6 +332,7 @@ func (a *App) router() *gin.Engine {
 	eval := api.Group("/eval", a.authRequired())
 	eval.GET("/categories", a.listCategories)
 	eval.POST("/sessions", a.createSession)
+	eval.GET("/sessions/:id/items", a.listSessionItems)
 	eval.GET("/sessions/:id/next", a.nextItem)
 	eval.POST("/votes", a.vote)
 	api.GET("/rankings", a.rankings)
@@ -532,7 +560,7 @@ func (a *App) buildSession(userID, categoryID string, count int, mode string, ar
 	}
 	rand.Shuffle(len(questions), func(i, j int) { questions[i], questions[j] = questions[j], questions[i] })
 	now := time.Now()
-	session := EvalSession{ID: newID(), UserID: userID, CategoryID: categoryID, Mode: mode, Status: "active", RequestedCount: count, CreatedAt: now}
+	session := EvalSession{ID: newID(), UserID: userID, CategoryID: categoryID, Mode: mode, Status: "active", DesiredCount: count, RequestedCount: 0, CreatedAt: now}
 	err := a.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&session).Error; err != nil {
 			return err
@@ -570,9 +598,71 @@ func (a *App) buildSession(userID, categoryID string, count int, mode string, ar
 		if position == 0 {
 			return errors.New("没有足够的题目和模型回答可用于盲评")
 		}
-		return tx.Model(&session).Update("requested_count", position).Error
+		if err := tx.Model(&session).Update("requested_count", position).Error; err != nil {
+			return err
+		}
+		session.RequestedCount = position
+		return nil
 	})
 	return session, err
+}
+
+func (a *App) listSessionItems(c *gin.Context) {
+	userID := currentUser(c).ID
+	sessionID := c.Param("id")
+	var sess EvalSession
+	if err := a.db.First(&sess, "id = ? AND user_id = ?", sessionID, userID).Error; err != nil {
+		fail(c, http.StatusNotFound, "会话不存在")
+		return
+	}
+	var items []EvalItem
+	if err := a.db.Where("session_id = ?", sessionID).Order("position ASC").Find(&items).Error; err != nil {
+		fail(c, http.StatusInternalServerError, "读取题目失败")
+		return
+	}
+	type itemPayload struct {
+		ItemID          string `json:"itemId"`
+		Position        int    `json:"position"`
+		Question        gin.H  `json:"question"`
+		Left            gin.H  `json:"left"`
+		Right           gin.H  `json:"right"`
+		Voted           bool   `json:"voted"`
+		WinnerSide      string `json:"winnerSide,omitempty"`
+		ConfidenceScore int    `json:"confidenceScore,omitempty"`
+	}
+	out := make([]itemPayload, 0, len(items))
+	for _, it := range items {
+		var q Question
+		var left, right ModelAnswer
+		a.db.First(&q, "id = ?", it.QuestionID)
+		a.db.First(&left, "id = ?", it.LeftAnswerID)
+		a.db.First(&right, "id = ?", it.RightAnswerID)
+		var vote EvalVote
+		voted := a.db.Where("user_id = ? AND item_id = ?", userID, it.ID).First(&vote).Error == nil
+		payload := itemPayload{
+			ItemID:   it.ID,
+			Position: it.Position,
+			Question: gin.H{"id": q.ID, "prompt": q.Prompt},
+			Left:     gin.H{"answerId": left.ID, "text": left.AnswerText},
+			Right:    gin.H{"answerId": right.ID, "text": right.AnswerText},
+			Voted:    voted,
+		}
+		if voted {
+			payload.ConfidenceScore = vote.ConfidenceScore
+			if vote.WinnerAnswerID == it.LeftAnswerID {
+				payload.WinnerSide = "left"
+			} else {
+				payload.WinnerSide = "right"
+			}
+		}
+		out = append(out, payload)
+	}
+	ok(c, gin.H{
+		"sessionId":      sess.ID,
+		"desiredCount":   sess.DesiredCount,
+		"requestedCount": len(out),
+		"items":          out,
+	})
 }
 
 func (a *App) nextItem(c *gin.Context) {

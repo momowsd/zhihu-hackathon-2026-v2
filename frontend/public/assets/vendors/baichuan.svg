@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="Baichuan">
+  <defs>
+    <linearGradient id="baichuan-brand-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FCA5A5" />
+      <stop offset="100%" stop-color="#DC2626" />
+    </linearGradient>
+  </defs>
+  <circle cx="12" cy="12" r="11" fill="url(#baichuan-brand-grad)" />
+  <text
+    x="12"
+    y="16"
+    text-anchor="middle"
+    fill="#fff"
+    font-family="system-ui, -apple-system, sans-serif"
+    font-size="12"
+    font-weight="800"
+  >
+    B
+  </text>
+</svg>

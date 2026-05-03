@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="Volcengine">
+  <defs>
+    <linearGradient id="volcengine-brand-grad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#F97316" />
+      <stop offset="100%" stop-color="#EA580C" />
+    </linearGradient>
+  </defs>
+  <path
+    fill="url(#volcengine-brand-grad)"
+    d="M12 3 4 19h4l2.5-5.2L12 9l1.5 4.8L16 19h4L12 3Z"
+  />
+  <path fill="#FFF7ED" d="M12 10.5 9.5 17 14.5 17z" opacity="0.9" />
+</svg>

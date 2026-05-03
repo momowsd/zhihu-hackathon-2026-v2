@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="Zhipu AI">
+  <defs>
+    <linearGradient id="zhipu-brand-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#A78BFA" />
+      <stop offset="100%" stop-color="#5B21B6" />
+    </linearGradient>
+  </defs>
+  <rect width="24" height="24" rx="7" fill="url(#zhipu-brand-grad)" />
+  <text
+    x="12"
+    y="16.5"
+    text-anchor="middle"
+    fill="#fff"
+    font-family="system-ui, -apple-system, sans-serif"
+    font-size="11"
+    font-weight="800"
+  >
+    Z
+  </text>
+</svg>
