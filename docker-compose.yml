@@ -1,12 +1,20 @@
+# Compose reads `.env` from this directory for `${VAR}` substitution below.
+# Copy `.env.example` to `.env` and adjust (especially JWT_SECRET and Zhihu keys).
+
 services:
   backend:
     build:
       context: ./backend
     environment:
-      SERVER_ADDRESS: ":8080"
-      JWT_SECRET: "change-me-in-production"
-      DB_DSN: "file:data/app.db?cache=shared&mode=rwc"
-      OPENAI_TIMEOUT_SECONDS: "30"
+      SERVER_ADDRESS: "${SERVER_ADDRESS:-:8080}"
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      DB_DSN: ${DB_DSN:-file:data/app.db?cache=shared&mode=rwc}
+      OPENAI_TIMEOUT_SECONDS: ${OPENAI_TIMEOUT_SECONDS:-30}
+      ZHIHU_APP_ID: ${ZHIHU_APP_ID:-}
+      ZHIHU_APP_KEY: ${ZHIHU_APP_KEY:-}
+      ZHIHU_REDIRECT_URI: ${ZHIHU_REDIRECT_URI:-http://localhost:8080/api/v1/auth/zhihu/callback}
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:5180}
+      ZHIHU_OPENAPI_HOST: ${ZHIHU_OPENAPI_HOST:-openapi.zhihu.com}
     volumes:
       - backend_data:/app/data
     ports:

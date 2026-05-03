@@ -20,8 +20,8 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/joho/godotenv"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -37,19 +37,41 @@ const (
 	sessionModeArena = "arena"
 )
 
+// loadEnvFiles reads optional .env files (repo root then backend cwd). Does not override variables already set in the environment.
+func loadEnvFiles() {
+	for _, path := range []string{"../.env", ".env"} {
+		if _, err := os.Stat(path); err != nil {
+			continue
+		}
+		if err := godotenv.Load(path); err != nil {
+			log.Printf("warning: load env file %s: %v", path, err)
+		}
+	}
+}
+
 type Config struct {
-	Address     string
-	DBDSN       string
-	JWTSecret   string
-	HTTPTimeout time.Duration
+	Address          string
+	DBDSN            string
+	JWTSecret        string
+	HTTPTimeout      time.Duration
+	ZhihuAppID       string
+	ZhihuAppKey      string
+	ZhihuRedirectURI string
+	ZhihuOpenAPIHost string
+	FrontendOrigin   string
 }
 
 func loadConfig() Config {
 	return Config{
-		Address:     getenv("SERVER_ADDRESS", ":8080"),
-		DBDSN:       getenv("DB_DSN", "file:data/app.db?cache=shared&mode=rwc"),
-		JWTSecret:   getenv("JWT_SECRET", defaultJWT),
-		HTTPTimeout: time.Duration(getenvInt("OPENAI_TIMEOUT_SECONDS", 30)) * time.Second,
+		Address:          getenv("SERVER_ADDRESS", ":8080"),
+		DBDSN:            getenv("DB_DSN", "file:data/app.db?cache=shared&mode=rwc"),
+		JWTSecret:        getenv("JWT_SECRET", defaultJWT),
+		HTTPTimeout:      time.Duration(getenvInt("OPENAI_TIMEOUT_SECONDS", 30)) * time.Second,
+		ZhihuAppID:       getenv("ZHIHU_APP_ID", ""),
+		ZhihuAppKey:      getenv("ZHIHU_APP_KEY", ""),
+		ZhihuRedirectURI: getenv("ZHIHU_REDIRECT_URI", "http://localhost:8080/api/v1/auth/zhihu/callback"),
+		ZhihuOpenAPIHost: getenv("ZHIHU_OPENAPI_HOST", "openapi.zhihu.com"),
+		FrontendOrigin:   getenv("FRONTEND_ORIGIN", "http://localhost:5180"),
 	}
 }
 
@@ -71,6 +93,7 @@ func getenvInt(key string, fallback int) int {
 type User struct {
 	ID           string     `gorm:"primaryKey;size:36" json:"id"`
 	Username     string     `gorm:"uniqueIndex;size:64;not null" json:"username"`
+	ZhihuUID     *string    `gorm:"size:64" json:"zhihuUid,omitempty"`
 	Role         string     `gorm:"size:32;not null;default:user" json:"role"`
 	Enabled      bool       `gorm:"not null;default:true" json:"enabled"`
 	PasswordHash string     `gorm:"size:255;not null" json:"-"`
@@ -127,17 +150,17 @@ type ModelAnswer struct {
 func (ModelAnswer) TableName() string { return "model_answers" }
 
 type EvalSession struct {
-	ID             string     `gorm:"primaryKey;size:36" json:"id"`
-	UserID         string     `gorm:"index;size:36;not null" json:"userId"`
-	CategoryID     string     `gorm:"index;size:36;not null" json:"categoryId"`
-	Mode           string     `gorm:"size:32;not null" json:"mode"`
-	Status         string     `gorm:"size:32;not null" json:"status"`
+	ID         string `gorm:"primaryKey;size:36" json:"id"`
+	UserID     string `gorm:"index;size:36;not null" json:"userId"`
+	CategoryID string `gorm:"index;size:36;not null" json:"categoryId"`
+	Mode       string `gorm:"size:32;not null" json:"mode"`
+	Status     string `gorm:"size:32;not null" json:"status"`
 	// RequestedCount 本局实际生成的小题数量（eval_items 条数）
 	RequestedCount int `gorm:"not null" json:"requestedCount"`
 	// DesiredCount 用户希望的本局题数；若该主题下可组 1v1 的题不足，实际会小于 DesiredCount
-	DesiredCount  int        `gorm:"not null;default:0" json:"desiredCount"`
-	CreatedAt     time.Time  `gorm:"not null" json:"createdAt"`
-	CompletedAt   *time.Time `json:"completedAt,omitempty"`
+	DesiredCount int        `gorm:"not null;default:0" json:"desiredCount"`
+	CreatedAt    time.Time  `gorm:"not null" json:"createdAt"`
+	CompletedAt  *time.Time `json:"completedAt,omitempty"`
 }
 
 func (EvalSession) TableName() string { return "eval_sessions" }
@@ -197,12 +220,15 @@ type SubmittedEndpoint struct {
 func (SubmittedEndpoint) TableName() string { return "submitted_endpoints" }
 
 type App struct {
-	db     *gorm.DB
-	cfg    Config
-	client *http.Client
+	db           *gorm.DB
+	cfg          Config
+	client       *http.Client
+	oauthStates  *oauthNonceStore
+	oauthTickets *oauthTicketStore
 }
 
 func main() {
+	loadEnvFiles()
 	cfg := loadConfig()
 	if err := os.MkdirAll("data", 0o755); err != nil {
 		log.Fatal(err)
@@ -214,7 +240,13 @@ func main() {
 	if err := migrateAndSeed(db); err != nil {
 		log.Fatal(err)
 	}
-	app := &App{db: db, cfg: cfg, client: &http.Client{Timeout: cfg.HTTPTimeout}}
+	app := &App{
+		db:           db,
+		cfg:          cfg,
+		client:       &http.Client{Timeout: cfg.HTTPTimeout},
+		oauthStates:  newOAuthNonceStore(),
+		oauthTickets: newOAuthTicketStore(),
+	}
 	router := app.router()
 	log.Printf("llm arena backend listening on %s", cfg.Address)
 	if err := router.Run(cfg.Address); err != nil {
@@ -224,6 +256,10 @@ func main() {
 
 func migrateAndSeed(db *gorm.DB) error {
 	if err := db.AutoMigrate(&User{}, &EvalCategory{}, &Question{}, &Model{}, &ModelAnswer{}, &EvalSession{}, &EvalItem{}, &EvalVote{}, &ModelStat{}, &SubmittedEndpoint{}); err != nil {
+		return err
+	}
+	// SQLite forbids ADD COLUMN … UNIQUE; apply uniqueness with a standalone index after the column exists.
+	if err := db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_zhihu_uid ON users(zhihu_uid)").Error; err != nil {
 		return err
 	}
 	var count int64
@@ -327,6 +363,9 @@ func (a *App) router() *gin.Engine {
 	api.POST("/auth/register", a.register)
 	api.POST("/auth/login", a.login)
 	api.POST("/auth/refresh", a.refresh)
+	api.GET("/auth/zhihu/start", a.zhihuOAuthStart)
+	api.GET("/auth/zhihu/callback", a.zhihuOAuthCallback)
+	api.POST("/auth/zhihu/exchange", a.zhihuOAuthExchange)
 	user := api.Group("/user", a.authRequired())
 	user.GET("/me", a.me)
 	eval := api.Group("/eval", a.authRequired())
@@ -353,172 +392,8 @@ func (a *App) router() *gin.Engine {
 	admin.GET("/answers", a.adminListAnswers)
 	admin.POST("/answers", a.adminCreateAnswer)
 	admin.PUT("/answers/:id", a.adminUpdateAnswer)
+	admin.GET("/browse/:table", a.adminBrowseTable)
 	return r
-}
-
-type tokenPair struct {
-	AccessToken  string `json:"accessToken"`
-	RefreshToken string `json:"refreshToken"`
-	ExpiresIn    int64  `json:"expiresIn"`
-}
-
-func (a *App) register(c *gin.Context) {
-	var req struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-	}
-	if !bind(c, &req) {
-		return
-	}
-	req.Username = strings.TrimSpace(req.Username)
-	if len(req.Username) < 3 || len(req.Password) < 6 {
-		fail(c, http.StatusBadRequest, "用户名至少 3 位，密码至少 6 位")
-		return
-	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-	if err != nil {
-		fail(c, http.StatusInternalServerError, "密码处理失败")
-		return
-	}
-	u := User{ID: newID(), Username: req.Username, Role: roleUser, Enabled: true, PasswordHash: string(hash), CreatedAt: time.Now()}
-	if err := a.db.Create(&u).Error; err != nil {
-		fail(c, http.StatusConflict, "用户名已存在")
-		return
-	}
-	tokens, err := a.issueTokens(u)
-	if err != nil {
-		fail(c, http.StatusInternalServerError, "签发 token 失败")
-		return
-	}
-	ok(c, tokens)
-}
-
-func (a *App) login(c *gin.Context) {
-	var req struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-	}
-	if !bind(c, &req) {
-		return
-	}
-	var u User
-	if err := a.db.Where("username = ?", strings.TrimSpace(req.Username)).First(&u).Error; err != nil || !u.Enabled {
-		fail(c, http.StatusUnauthorized, "用户名或密码错误")
-		return
-	}
-	if bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(req.Password)) != nil {
-		fail(c, http.StatusUnauthorized, "用户名或密码错误")
-		return
-	}
-	now := time.Now()
-	a.db.Model(&u).Update("last_login_at", now)
-	u.LastLoginAt = &now
-	tokens, err := a.issueTokens(u)
-	if err != nil {
-		fail(c, http.StatusInternalServerError, "签发 token 失败")
-		return
-	}
-	ok(c, tokens)
-}
-
-func (a *App) refresh(c *gin.Context) {
-	var req struct {
-		RefreshToken string `json:"refreshToken"`
-	}
-	if !bind(c, &req) {
-		return
-	}
-	claims, err := a.parseToken(req.RefreshToken)
-	if err != nil || claims["tokenType"] != "refresh" {
-		fail(c, http.StatusUnauthorized, "refresh token 无效")
-		return
-	}
-	var u User
-	if err := a.db.First(&u, "id = ?", claims["sub"]).Error; err != nil || !u.Enabled {
-		fail(c, http.StatusUnauthorized, "用户无效")
-		return
-	}
-	tokens, err := a.issueTokens(u)
-	if err != nil {
-		fail(c, http.StatusInternalServerError, "签发 token 失败")
-		return
-	}
-	ok(c, tokens)
-}
-
-func (a *App) me(c *gin.Context) {
-	ok(c, currentUser(c))
-}
-
-func (a *App) issueTokens(u User) (tokenPair, error) {
-	now := time.Now()
-	accessExp := now.Add(time.Hour)
-	refreshExp := now.Add(7 * 24 * time.Hour)
-	access, err := a.sign(jwt.MapClaims{"sub": u.ID, "username": u.Username, "role": u.Role, "tokenType": "access", "iat": now.Unix(), "exp": accessExp.Unix()})
-	if err != nil {
-		return tokenPair{}, err
-	}
-	refresh, err := a.sign(jwt.MapClaims{"sub": u.ID, "username": u.Username, "role": u.Role, "tokenType": "refresh", "iat": now.Unix(), "exp": refreshExp.Unix()})
-	return tokenPair{AccessToken: access, RefreshToken: refresh, ExpiresIn: int64(time.Hour.Seconds())}, err
-}
-
-func (a *App) sign(claims jwt.MapClaims) (string, error) {
-	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(a.cfg.JWTSecret))
-}
-
-func (a *App) parseToken(raw string) (jwt.MapClaims, error) {
-	claims := jwt.MapClaims{}
-	token, err := jwt.ParseWithClaims(raw, claims, func(token *jwt.Token) (any, error) {
-		return []byte(a.cfg.JWTSecret), nil
-	})
-	if err != nil || !token.Valid {
-		return nil, errors.New("invalid token")
-	}
-	return claims, nil
-}
-
-func (a *App) authRequired() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		header := c.GetHeader("Authorization")
-		if !strings.HasPrefix(header, "Bearer ") {
-			fail(c, http.StatusUnauthorized, "缺少登录态")
-			c.Abort()
-			return
-		}
-		claims, err := a.parseToken(strings.TrimPrefix(header, "Bearer "))
-		if err != nil || claims["tokenType"] != "access" {
-			fail(c, http.StatusUnauthorized, "登录态无效")
-			c.Abort()
-			return
-		}
-		var u User
-		if err := a.db.First(&u, "id = ?", fmt.Sprint(claims["sub"])).Error; err != nil || !u.Enabled {
-			fail(c, http.StatusUnauthorized, "用户无效")
-			c.Abort()
-			return
-		}
-		c.Set("user", u)
-		c.Next()
-	}
-}
-
-func (a *App) adminRequired() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		if currentUser(c).Role != roleAdmin {
-			fail(c, http.StatusForbidden, "需要管理员权限")
-			c.Abort()
-			return
-		}
-		c.Next()
-	}
-}
-
-func currentUser(c *gin.Context) User {
-	u, _ := c.Get("user")
-	if user, ok := u.(User); ok {
-		return user
-	}
-	return User{}
 }
 
 func (a *App) listCategories(c *gin.Context) {

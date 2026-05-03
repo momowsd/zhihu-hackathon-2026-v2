@@ -8,12 +8,14 @@ import RankingView from './views/RankingView.vue'
 import EndpointArenaView from './views/EndpointArenaView.vue'
 import AdminView from './views/AdminView.vue'
 import UserCenterView from './views/UserCenterView.vue'
+import ZhihuOAuthCallbackView from './views/ZhihuOAuthCallbackView.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', name: 'home', component: HomeView },
     { path: '/login', name: 'login', component: LoginView },
+    { path: '/oauth/zhihu/callback', name: 'zhihu-oauth-callback', component: ZhihuOAuthCallbackView },
     { path: '/dashboard', name: 'dashboard', component: DashboardView, meta: { requiresAuth: true } },
     { path: '/eval', name: 'eval', component: BlindEvalView, meta: { requiresAuth: true } },
     { path: '/rankings', name: 'rankings', component: RankingView, meta: { requiresAuth: true } },

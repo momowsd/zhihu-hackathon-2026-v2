@@ -49,6 +49,21 @@ export type TokenPair = {
   expiresIn: number
 }
 
+/** Admin：分页浏览数据库表 */
+export type PaginatedTableBrowse = {
+  items: Record<string, unknown>[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+export async function adminBrowseTable(table: string, page: number, pageSize: number) {
+  const response = await api.get<ApiEnvelope<PaginatedTableBrowse>>(`/admin/browse/${encodeURIComponent(table)}`, {
+    params: { page, pageSize },
+  })
+  return response.data.data
+}
+
 export async function login(username: string, password: string) {
   const response = await api.post<ApiEnvelope<TokenPair>>('/auth/login', { username, password })
   saveTokens(response.data.data.accessToken, response.data.data.refreshToken)
@@ -56,6 +71,16 @@ export async function login(username: string, password: string) {
 
 export async function register(username: string, password: string) {
   const response = await api.post<ApiEnvelope<TokenPair>>('/auth/register', { username, password })
+  saveTokens(response.data.data.accessToken, response.data.data.refreshToken)
+}
+
+export async function startZhihuOAuth() {
+  const response = await api.get<ApiEnvelope<{ authorizeUrl: string }>>('/auth/zhihu/start')
+  return response.data.data.authorizeUrl
+}
+
+export async function exchangeZhihuOAuthTicket(ticket: string) {
+  const response = await api.post<ApiEnvelope<TokenPair>>('/auth/zhihu/exchange', { ticket })
   saveTokens(response.data.data.accessToken, response.data.data.refreshToken)
 }
 
