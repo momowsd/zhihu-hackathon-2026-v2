@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/admin-import-bundle.schema.json",
+  "title": "AdminImportBundle",
+  "type": "object",
+  "required": ["version", "categories", "models", "questions", "answers"],
+  "properties": {
+    "version": { "type": "integer", "const": 1 },
+    "categories": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["code", "name"],
+        "properties": {
+          "code": { "type": "string" },
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "enabled": { "type": "boolean" },
+          "sortOrder": { "type": "integer" }
+        }
+      }
+    },
+    "models": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["ref", "provider", "name", "displayName"],
+        "properties": {
+          "ref": { "type": "string" },
+          "provider": { "type": "string" },
+          "name": { "type": "string" },
+          "displayName": { "type": "string" },
+          "version": { "type": "string" },
+          "isBaseline": { "type": "boolean" },
+          "enabled": { "type": "boolean" }
+        }
+      }
+    },
+    "questions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["ref", "categoryCode", "prompt"],
+        "properties": {
+          "ref": { "type": "string" },
+          "categoryCode": { "type": "string" },
+          "prompt": { "type": "string" },
+          "source": { "type": "string" },
+          "difficulty": { "type": "string" },
+          "enabled": { "type": "boolean" }
+        }
+      }
+    },
+    "answers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["questionRef", "modelRef", "answerText"],
+        "properties": {
+          "questionRef": { "type": "string" },
+          "modelRef": { "type": "string" },
+          "answerText": { "type": "string" },
+          "metadataJson": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -575,19 +575,57 @@ textarea {
 .data-overview-toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  align-items: flex-end;
-  margin: 16px 0 12px;
+  gap: 8px 12px;
+  align-items: center;
+  margin: 12px 0 10px;
 }
 
 .data-overview-toolbar .browse-field {
-  display: grid;
-  gap: 6px;
-  min-width: 160px;
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
 .data-overview-toolbar .browse-field span {
   font-size: 12px;
+  flex-shrink: 0;
+}
+
+/* 数据表：标签 + 下拉同一行，宽度收敛 */
+.data-overview-toolbar .browse-field:first-of-type {
+  flex: 1 1 200px;
+  max-width: min(100%, 280px);
+}
+
+.data-overview-toolbar .browse-field:first-of-type select {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 8px 11px;
+  border-radius: 12px;
+}
+
+/* 每页条数：窄下拉 */
+.data-overview-toolbar .browse-field:nth-of-type(2) {
+  flex: 0 0 auto;
+}
+
+.data-overview-toolbar .browse-field:nth-of-type(2) select {
+  width: auto;
+  min-width: 4.25rem;
+  padding: 8px 11px;
+  border-radius: 12px;
+}
+
+/* 与下拉同一基准线，避免 flex-end + 双行 label 导致的错位 */
+.data-overview-toolbar > .muted {
+  font-size: 13px;
+  line-height: 1.25;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 2px;
 }
 
 .data-table-scroll {

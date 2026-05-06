@@ -201,8 +201,11 @@ const summaryStats = computed(() => {
 })
 
 async function load() {
-  const response = await api.get<ApiEnvelope<RankRow[]>>('/rankings', { params: { categoryId: categoryId.value || undefined } })
-  rows.value = response.data.data
+  rows.value = []
+  const response = await api.get<ApiEnvelope<RankRow[]>>('/rankings', {
+    params: { categoryId: categoryId.value || undefined },
+  })
+  rows.value = response.data.data ?? []
 }
 
 onMounted(async () => {
@@ -249,6 +252,28 @@ watch(categoryId, load)
         <span class="muted">最高综合分</span>
         <strong>{{ summaryStats.leader?.arenaScore }}</strong>
         <small>综合 Elo、胜率与热度</small>
+      </div>
+    </div>
+    <div v-else class="grid ranking-kpis ranking-kpis--empty">
+      <div class="card metric-card metric-card--empty-dash">
+        <span class="muted">当前冠军</span>
+        <strong class="dash-placeholder">--</strong>
+        <small class="muted">暂无数据</small>
+      </div>
+      <div class="card metric-card metric-card--empty-dash">
+        <span class="muted">总票数</span>
+        <strong class="dash-placeholder">--</strong>
+        <small class="muted">暂无数据</small>
+      </div>
+      <div class="card metric-card metric-card--empty-dash">
+        <span class="muted">平均胜率</span>
+        <strong class="dash-placeholder">--</strong>
+        <small class="muted">暂无数据</small>
+      </div>
+      <div class="card metric-card metric-card--empty-dash">
+        <span class="muted">最高综合分</span>
+        <strong class="dash-placeholder">--</strong>
+        <small class="muted">暂无数据</small>
       </div>
     </div>
 
@@ -397,23 +422,30 @@ watch(categoryId, load)
           <tr><th>#</th><th>模型</th><th>Provider</th><th>综合分</th><th>Elo</th><th>估算成本</th><th>胜率</th><th>热度</th><th>稳定性</th><th>最近变化</th></tr>
         </thead>
         <tbody>
-          <tr v-for="row in pricePerformanceRows" :key="row.modelId + row.rank">
-            <td><span class="rank-pill">#{{ row.rank }}</span></td>
-            <td><strong>{{ row.displayName }}</strong></td>
-            <td>{{ row.provider }}</td>
-            <td><strong>{{ row.arenaScore }}</strong></td>
-            <td>{{ row.eloRating.toFixed(0) }}</td>
-            <td>${{ row.blendedCost.toFixed(2) }}/1M</td>
-            <td>{{ (row.winRate * 100).toFixed(1) }}%</td>
-            <td>{{ row.voteCount }} 票 · {{ (row.usageShare * 100).toFixed(0) }}%</td>
-            <td>{{ row.reliability }}</td>
-            <td :class="{ positive: row.lastEloDelta > 0, negative: row.lastEloDelta < 0 }">
-              {{ row.lastEloDelta > 0 ? '+' : '' }}{{ row.lastEloDelta.toFixed(1) }}
-            </td>
+          <template v-if="rankedRows.length">
+            <tr v-for="row in pricePerformanceRows" :key="row.modelId + row.rank">
+              <td><span class="rank-pill">#{{ row.rank }}</span></td>
+              <td><strong>{{ row.displayName }}</strong></td>
+              <td>{{ row.provider }}</td>
+              <td><strong>{{ row.arenaScore }}</strong></td>
+              <td>{{ row.eloRating.toFixed(0) }}</td>
+              <td>${{ row.blendedCost.toFixed(2) }}/1M</td>
+              <td>{{ (row.winRate * 100).toFixed(1) }}%</td>
+              <td>{{ row.voteCount }} 票 · {{ (row.usageShare * 100).toFixed(0) }}%</td>
+              <td>{{ row.reliability }}</td>
+              <td :class="{ positive: row.lastEloDelta > 0, negative: row.lastEloDelta < 0 }">
+                {{ row.lastEloDelta > 0 ? '+' : '' }}{{ row.lastEloDelta.toFixed(1) }}
+              </td>
+            </tr>
+          </template>
+          <tr v-else class="ranking-empty-row">
+            <td v-for="col in 10" :key="'empty-' + col"><span class="dash-cell">--</span></td>
           </tr>
         </tbody>
       </table>
-      <p v-if="!rankedRows.length" class="muted empty-state">暂无投票，完成一次盲评后会出现排名。</p>
+      <p v-if="!rankedRows.length" class="muted empty-state">
+        当前筛选条件下暂无排名数据；可切换分类或完成对应主题的盲评后再查看。
+      </p>
     </div>
   </div>
 </template>
@@ -750,6 +782,24 @@ watch(categoryId, load)
 .empty-state {
   margin: 0;
   padding: 18px 0 4px;
+}
+
+.dash-placeholder,
+.dash-cell {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.metric-card--empty-dash strong.dash-placeholder {
+  font-size: 1.35rem;
+  font-weight: 750;
+}
+
+.ranking-empty-row td {
+  text-align: center;
+  padding: 20px 10px;
+  color: var(--text-secondary);
 }
 
 @media (max-width: 760px) {

@@ -64,6 +64,54 @@ export async function adminBrowseTable(table: string, page: number, pageSize: nu
   return response.data.data
 }
 
+export type QuestionDeleteImpact = {
+  votes: number
+  evalItems: number
+  modelAnswers: number
+  questions: number
+}
+
+export async function adminQuestionDeleteImpact(id: string) {
+  const response = await api.get<ApiEnvelope<QuestionDeleteImpact>>(
+    `/admin/questions/${encodeURIComponent(id)}/delete-impact`,
+  )
+  return response.data.data
+}
+
+export async function adminQuestionDeleteImpactBatch(ids: string[]) {
+  const response = await api.post<ApiEnvelope<QuestionDeleteImpact>>(`/admin/questions/delete-impact`, { ids })
+  return response.data.data
+}
+
+export async function adminDeleteQuestion(id: string) {
+  await api.delete(`/admin/questions/${encodeURIComponent(id)}`)
+}
+
+export async function adminDeleteQuestionsBatch(ids: string[]) {
+  await api.delete(`/admin/questions`, { data: { ids } })
+}
+
+export type ImportFieldError = {
+  row: string
+  field: string
+  message: string
+}
+
+export async function adminImportBundle(bundle: unknown) {
+  await api.post(`/admin/import/bundle`, bundle)
+}
+
+export function importBundleErrorDetail(error: unknown): { message: string; errors?: ImportFieldError[] } {
+  if (axios.isAxiosError(error)) {
+    const d = error.response?.data as { message?: string; errors?: ImportFieldError[] } | undefined
+    return {
+      message: d?.message ?? error.message,
+      errors: d?.errors,
+    }
+  }
+  return { message: error instanceof Error ? error.message : '请求失败' }
+}
+
 export async function login(username: string, password: string) {
   const response = await api.post<ApiEnvelope<TokenPair>>('/auth/login', { username, password })
   saveTokens(response.data.data.accessToken, response.data.data.refreshToken)

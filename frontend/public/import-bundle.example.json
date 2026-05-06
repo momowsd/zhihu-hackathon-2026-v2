@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "categories": [
+    {
+      "code": "demo_import",
+      "name": "导入示例分类",
+      "description": "可从 Admin 删除或按需修改 code 后导入",
+      "enabled": true,
+      "sortOrder": 99
+    }
+  ],
+  "models": [
+    {
+      "ref": "m_demo",
+      "provider": "openai",
+      "name": "gpt-demo",
+      "displayName": "GPT Demo",
+      "version": "1",
+      "isBaseline": true,
+      "enabled": true
+    }
+  ],
+  "questions": [
+    {
+      "ref": "q_demo",
+      "categoryCode": "demo_import",
+      "prompt": "示例题目：在常规算术下 1+1 等于几？",
+      "source": "import",
+      "difficulty": "normal",
+      "enabled": true
+    }
+  ],
+  "answers": [
+    {
+      "questionRef": "q_demo",
+      "modelRef": "m_demo",
+      "answerText": "在标准算术下等于 2。",
+      "metadataJson": "{}"
+    }
+  ]
+}

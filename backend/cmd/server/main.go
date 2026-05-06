@@ -393,6 +393,11 @@ func (a *App) router() *gin.Engine {
 	admin.POST("/answers", a.adminCreateAnswer)
 	admin.PUT("/answers/:id", a.adminUpdateAnswer)
 	admin.GET("/browse/:table", a.adminBrowseTable)
+	admin.GET("/questions/:id/delete-impact", a.adminQuestionDeleteImpactSingle)
+	admin.POST("/questions/delete-impact", a.adminQuestionDeleteImpactBatch)
+	admin.DELETE("/questions", a.adminDeleteQuestionsBatch)
+	admin.DELETE("/questions/:id", a.adminDeleteQuestion)
+	admin.POST("/import/bundle", a.adminImportBundle)
 	return r
 }
 
