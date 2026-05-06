@@ -51,7 +51,7 @@ async function loginWithZhihu() {
     <div class="card">
       <div class="header">
         <h1>模型盲评 Arena</h1>
-        <p class="muted">默认账号：demo / user123，管理员：admin / admin123</p>
+        <p class="muted">默认账号：demo / user123</p>
       </div>
       <form class="form" @submit.prevent="submit">
         <input v-model="username" placeholder="用户名" />
