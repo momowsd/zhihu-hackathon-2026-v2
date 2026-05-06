@@ -53,4 +53,4 @@ make backend
 docker compose up --build
 ```
 
-Compose 启动后前端映射：`http://localhost:5183`。
+Compose 将前端映射到主机 **80** 端口，浏览器访问 **`http://localhost`**（或 **`http://<公网IP>`**）即可，无需写端口；云上请在安全组放行 **TCP 80**。
