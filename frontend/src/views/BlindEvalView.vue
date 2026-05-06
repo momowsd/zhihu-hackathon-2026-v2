@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import type { Ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { api, errorMessage, loadCategories, type ApiEnvelope, type Category } from '../api'
 import { useRoute } from 'vue-router'
 
@@ -36,6 +37,80 @@ const pendingWinner = ref<'left' | 'right' | null>(null)
 const drafts = ref<Record<string, { pendingWinner: 'left' | 'right'; confidence: number }>>({})
 
 const currentRow = computed(() => sessionItems.value[currentIndex.value] ?? null)
+
+/** 盲评：先题干打字结束，再两侧回答并行打字（切换题目时取消上一轮） */
+const questionTyped = ref('')
+const leftTyped = ref('')
+const rightTyped = ref('')
+let typewriterRound = 0
+
+const CHAR_MS = 15
+
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, ms)
+  })
+}
+
+async function streamInto(target: Ref<string>, full: string, round: number) {
+  for (const ch of full) {
+    if (round !== typewriterRound) return
+    target.value += ch
+    await sleep(CHAR_MS)
+  }
+}
+
+watch(
+  () => currentRow.value,
+  async (row) => {
+    typewriterRound += 1
+    const round = typewriterRound
+    questionTyped.value = ''
+    leftTyped.value = ''
+    rightTyped.value = ''
+    if (!row) return
+
+    const instant =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+    if (instant || row.voted) {
+      questionTyped.value = row.question.prompt
+      leftTyped.value = row.left.text
+      rightTyped.value = row.right.text
+      return
+    }
+
+    await streamInto(questionTyped, row.question.prompt, round)
+    if (round !== typewriterRound) return
+
+    await Promise.all([
+      streamInto(leftTyped, row.left.text, round),
+      streamInto(rightTyped, row.right.text, round),
+    ])
+  },
+  { immediate: true },
+)
+
+const cursorQuestion = computed(() => {
+  const row = currentRow.value
+  if (!row || row.voted) return false
+  return questionTyped.value.length < row.question.prompt.length
+})
+
+const cursorLeft = computed(() => {
+  const row = currentRow.value
+  if (!row || row.voted) return false
+  if (questionTyped.value.length < row.question.prompt.length) return false
+  return leftTyped.value.length < row.left.text.length
+})
+
+const cursorRight = computed(() => {
+  const row = currentRow.value
+  if (!row || row.voted) return false
+  if (questionTyped.value.length < row.question.prompt.length) return false
+  return rightTyped.value.length < row.right.text.length
+})
 
 const allVoted = computed(
   () => sessionItems.value.length > 0 && sessionItems.value.every((r) => r.voted),
@@ -205,7 +280,10 @@ function progressLabel() {
 
       <div class="card eval-question">
         <div class="muted">题目</div>
-        <h2>{{ currentRow.question.prompt }}</h2>
+        <h2 :aria-label="currentRow.question.prompt">
+          <span aria-hidden="true">{{ questionTyped }}</span>
+          <span v-if="cursorQuestion" class="eval-type-cursor" aria-hidden="true">▍</span>
+        </h2>
       </div>
 
       <div class="grid eval-answers">
@@ -218,7 +296,10 @@ function progressLabel() {
           @click="pick('left')"
         >
           <h3>回答 A</h3>
-          <p>{{ currentRow.left.text }}</p>
+          <p :aria-label="currentRow.left.text">
+            <span aria-hidden="true">{{ leftTyped }}</span>
+            <span v-if="cursorLeft" class="eval-type-cursor" aria-hidden="true">▍</span>
+          </p>
           <button type="button" class="pick-btn" :disabled="currentRow.voted" @click.stop="pick('left')">
             A 更好
           </button>
@@ -232,7 +313,10 @@ function progressLabel() {
           @click="pick('right')"
         >
           <h3>回答 B</h3>
-          <p>{{ currentRow.right.text }}</p>
+          <p :aria-label="currentRow.right.text">
+            <span aria-hidden="true">{{ rightTyped }}</span>
+            <span v-if="cursorRight" class="eval-type-cursor" aria-hidden="true">▍</span>
+          </p>
           <button type="button" class="pick-btn" :disabled="currentRow.voted" @click.stop="pick('right')">
             B 更好
           </button>

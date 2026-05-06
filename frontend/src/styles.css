@@ -355,7 +355,7 @@ textarea {
   position: relative;
   max-width: 820px;
   margin: 14px 0 0;
-  font-size: clamp(42px, 7vw, 82px);
+  font-size: clamp(30px, 6vw, 56px);
   line-height: 0.95;
   letter-spacing: -0.07em;
 }
@@ -375,6 +375,131 @@ textarea {
   gap: 12px;
   margin-top: 26px;
   flex-wrap: wrap;
+}
+
+.hero-layout {
+  display: grid;
+  gap: clamp(22px, 4vw, 36px);
+  align-items: center;
+  position: relative;
+  z-index: 1;
+}
+
+@media (min-width: 880px) {
+  .hero-layout {
+    /* 左侧略增、右侧略收，列间距收紧，减少中间空白 */
+    grid-template-columns: minmax(0, 1.22fr) minmax(200px, 0.78fr);
+    column-gap: clamp(10px, 1.6vw, 20px);
+  }
+}
+
+.hero-copy {
+  min-width: 0;
+}
+
+.hero-visual {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: min(260px, 44vw);
+}
+
+.hero-arena-svg {
+  width: 100%;
+  max-width: 440px;
+  height: auto;
+  overflow: visible;
+}
+
+.hero-arena-ellipse {
+  fill: color-mix(in srgb, var(--brand-2) 8%, transparent);
+  stroke: color-mix(in srgb, var(--border) 90%, transparent);
+  stroke-width: 1;
+  opacity: 0.65;
+}
+
+.hero-arena-blind {
+  stroke: color-mix(in srgb, var(--text-secondary) 55%, transparent);
+  opacity: 0.85;
+}
+
+.hero-arena-card {
+  stroke-width: 1.5;
+}
+
+.hero-arena-card--l {
+  fill: color-mix(in srgb, var(--brand) 16%, transparent);
+  stroke: color-mix(in srgb, var(--brand) 48%, var(--border));
+}
+
+.hero-arena-card--r {
+  fill: color-mix(in srgb, var(--brand-2) 12%, transparent);
+  stroke: color-mix(in srgb, var(--brand-2) 45%, var(--border));
+}
+
+.hero-arena-label {
+  fill: var(--text-primary);
+  font-size: 52px;
+  font-weight: 800;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.06em;
+  opacity: 0.92;
+}
+
+.hero-arena-vs-ring {
+  fill: color-mix(in srgb, var(--surface-solid) 92%, transparent);
+  stroke: url(#heroArenaStroke);
+  stroke-width: 2;
+}
+
+.hero-arena-vs {
+  fill: var(--text-secondary);
+  font-size: 15px;
+  font-weight: 800;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0.14em;
+}
+
+.hero-arena-arrow {
+  stroke: color-mix(in srgb, var(--brand-2) 88%, var(--text-primary));
+  opacity: 0.9;
+}
+
+.hero-arena-caption {
+  fill: var(--text-secondary);
+  font-size: 11px;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+@keyframes eval-type-cursor-blink {
+  0%,
+  48% {
+    opacity: 1;
+  }
+
+  50%,
+  100% {
+    opacity: 0.12;
+  }
+}
+
+.eval-type-cursor {
+  display: inline-block;
+  margin-left: 1px;
+  font-weight: 300;
+  color: color-mix(in srgb, var(--brand-2) 85%, var(--text-primary));
+  animation: eval-type-cursor-blink 1.05s step-end infinite;
+  vertical-align: -0.06em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eval-type-cursor {
+    animation: none;
+    opacity: 1;
+  }
 }
 
 .link-btn {
