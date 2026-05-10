@@ -6,6 +6,7 @@ RUN sed -i 's|dl-cdn.alpinelinux.org|mirrors.aliyun.com|g' /etc/apk/repositories
 COPY go.mod go.sum* ./
 RUN go env -w GOPROXY=https://goproxy.cn,direct && go mod download
 COPY . .
+# mattn/go-sqlite3 (via gorm.io/driver/sqlite) requires CGO; CGO_ENABLED=0 breaks the build.
 RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 GOMAXPROCS=1 GOMEMLIMIT=700MiB \
     CGO_CFLAGS="-D_LARGEFILE64_SOURCE" \
     go build -p=1 -o /out/server ./cmd/server

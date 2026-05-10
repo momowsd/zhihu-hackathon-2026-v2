@@ -1,8 +1,23 @@
 <script setup lang="ts">
+import { ref, useTemplateRef } from 'vue'
 import { useRouter } from 'vue-router'
 import { getAccessToken } from '../auth'
 
 const router = useRouter()
+
+const HERO_KANSHAN_MP4 = '/assets/kanshan_imgs/liukanshan_1_1.mp4'
+
+/** 自动播放必须 muted；开声需用户点击（浏览器策略） */
+const heroVideoRef = useTemplateRef<HTMLVideoElement>('heroVideo')
+const heroSoundOn = ref(false)
+
+function toggleHeroSound() {
+  const v = heroVideoRef.value
+  if (!v) return
+  v.muted = !v.muted
+  heroSoundOn.value = !v.muted
+  void v.play().catch(() => {})
+}
 
 function primaryAction() {
   router.push(getAccessToken() ? '/dashboard' : '/login')
@@ -14,11 +29,12 @@ function primaryAction() {
     <div class="hero-card">
       <div class="hero-layout">
         <div class="hero-copy">
-          <div class="eyebrow">LLM Blind Evaluation Arena</div>
+          <div class="eyebrow">LLM Blind Evaluation Arena · 刘看山在场</div>
           <h1>用真实用户偏好，比较大模型回答效果。</h1>
           <p>
             这是一个面向 hackathon 的大模型盲评与打榜站点：用户在不知道模型身份的情况下比较回答，
             系统用 Elo 聚合胜负结果，让“哪个模型更会回答”变成可观察、可讨论、可迭代的数据。
+            知乎 IP「刘看山」会在首页与 Battle 里陪你读题、选档；首屏用循环短片呈现形象，Battle 里仍可点点他听一句主持词。
           </p>
           <div class="hero-actions">
             <button @click="primaryAction">{{ getAccessToken() ? '进入 Dashboard' : '登录开始盲评' }}</button>
@@ -26,44 +42,31 @@ function primaryAction() {
           </div>
         </div>
 
-        <div class="hero-visual" aria-hidden="true">
-          <svg class="hero-arena-svg" viewBox="0 0 440 300" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="heroArenaStroke" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="var(--brand)" />
-                <stop offset="100%" stop-color="var(--brand-2)" />
-              </linearGradient>
-            </defs>
-
-            <ellipse cx="220" cy="168" rx="190" ry="118" class="hero-arena-ellipse" />
-
-            <path
-              class="hero-arena-blind"
-              d="M108 138 H332"
-              stroke-dasharray="6 10"
-              stroke-width="1.5"
-              stroke-linecap="round"
-            />
-
-            <rect x="36" y="78" width="148" height="172" rx="22" class="hero-arena-card hero-arena-card--l" />
-            <rect x="256" y="78" width="148" height="172" rx="22" class="hero-arena-card hero-arena-card--r" />
-
-            <text x="110" y="182" text-anchor="middle" class="hero-arena-label">A</text>
-            <text x="330" y="182" text-anchor="middle" class="hero-arena-label">B</text>
-
-            <circle cx="220" cy="156" r="36" class="hero-arena-vs-ring" />
-            <text x="220" y="166" text-anchor="middle" class="hero-arena-vs">VS</text>
-
-            <path
-              d="M220 52 v28 M208 68 l12 12 12-12"
-              class="hero-arena-arrow"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-            />
-
-            <text x="220" y="268" text-anchor="middle" class="hero-arena-caption">Blind · Elo · Ranking</text>
-          </svg>
+        <div class="hero-visual">
+          <div class="hero-visual-stack">
+            <div class="hero-kanshan-video-wrap">
+              <video
+                ref="heroVideo"
+                class="hero-kanshan-video"
+                :src="HERO_KANSHAN_MP4"
+                autoplay
+                loop
+                muted
+                playsinline
+                disablepictureinpicture
+                aria-label="刘看山形象短片（循环播放，默认静音；可开启声音）"
+              />
+              <button
+                type="button"
+                class="hero-kanshan-sound-btn"
+                :aria-pressed="heroSoundOn"
+                :aria-label="heroSoundOn ? '关闭短片声音' : '开启短片声音'"
+                @click="toggleHeroSound"
+              >
+                {{ heroSoundOn ? '静音' : '开启声音' }}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

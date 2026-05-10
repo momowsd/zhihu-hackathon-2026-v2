@@ -11,7 +11,7 @@ const profileOpen = ref(false)
 
 const navItems = computed(() => [
   { to: '/dashboard', label: 'Dashboard', show: auth.isAuthed.value },
-  { to: '/eval', label: '盲评', show: auth.isAuthed.value },
+  { to: '/eval', label: 'Battle', show: auth.isAuthed.value },
   { to: '/rankings', label: 'Ranking', show: auth.isAuthed.value },
   { to: '/arena', label: 'Endpoint Arena', show: auth.isAuthed.value },
   { to: '/admin', label: 'Admin', show: auth.isAdmin.value },

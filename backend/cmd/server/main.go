@@ -185,6 +185,9 @@ type EvalVote struct {
 	ItemID          string    `gorm:"uniqueIndex:idx_vote_user_item;size:36;not null" json:"itemId"`
 	QuestionID      string    `gorm:"index;size:36;not null" json:"questionId"`
 	WinnerAnswerID  string    `gorm:"size:36;not null" json:"winnerAnswerId"`
+	// VoteOutcome: left | right | both_good | both_bad。历史数据为空时按 winner_answer_id 与左右答案推断 left/right。
+	VoteOutcome     string    `gorm:"size:24;not null;default:''" json:"voteOutcome"`
+	// ConfidenceScore 历史为 1–5 信心分；现由盲评四档写入档位编码（见 voteTierStoredScore），不再来自请求体。
 	ConfidenceScore int       `gorm:"not null" json:"confidenceScore"`
 	RatingScale     int       `gorm:"not null;default:5" json:"ratingScale"`
 	CreatedAt       time.Time `gorm:"not null" json:"createdAt"`
@@ -507,6 +510,7 @@ func (a *App) listSessionItems(c *gin.Context) {
 		Left            gin.H  `json:"left"`
 		Right           gin.H  `json:"right"`
 		Voted           bool   `json:"voted"`
+		Outcome         string `json:"outcome,omitempty"`
 		WinnerSide      string `json:"winnerSide,omitempty"`
 		ConfidenceScore int    `json:"confidenceScore,omitempty"`
 	}
@@ -529,9 +533,18 @@ func (a *App) listSessionItems(c *gin.Context) {
 		}
 		if voted {
 			payload.ConfidenceScore = vote.ConfidenceScore
-			if vote.WinnerAnswerID == it.LeftAnswerID {
+			outcome := strings.TrimSpace(vote.VoteOutcome)
+			if outcome == "" {
+				if vote.WinnerAnswerID == it.LeftAnswerID {
+					outcome = "left"
+				} else {
+					outcome = "right"
+				}
+			}
+			payload.Outcome = outcome
+			if outcome == "left" {
 				payload.WinnerSide = "left"
-			} else {
+			} else if outcome == "right" {
 				payload.WinnerSide = "right"
 			}
 		}
@@ -573,36 +586,112 @@ func (a *App) nextItem(c *gin.Context) {
 	})
 }
 
+func parseEvalVoteOutcome(outcome, winnerSide string) (string, error) {
+	switch strings.TrimSpace(strings.ToLower(outcome)) {
+	case "left", "a_better":
+		return "left", nil
+	case "right", "b_better":
+		return "right", nil
+	case "both_good":
+		return "both_good", nil
+	case "both_bad":
+		return "both_bad", nil
+	case "":
+		switch strings.TrimSpace(strings.ToLower(winnerSide)) {
+		case "left":
+			return "left", nil
+		case "right":
+			return "right", nil
+		default:
+			return "", errors.New("缺少 outcome（left / right / both_good / both_bad），或兼容旧客户端时提供 winnerSide: left|right")
+		}
+	default:
+		return "", errors.New("未知 outcome，允许: left, right, both_good, both_bad（或 a_better / b_better）")
+	}
+}
+
+// 盲评四档：写入 eval_votes.confidence_score 的档位编码（1–5，兼容旧「信心分」列，仅作统计区分，不再由用户滑条决定）。
+func voteTierStoredScore(outcome string) int {
+	switch outcome {
+	case "left", "right":
+		return 5 // 单侧更好：等价于「强胜负」档
+	case "both_good":
+		return 3 // 平局·都好
+	case "both_bad":
+		return 2 // 平局·都不好（与 3 区分）
+	default:
+		return 3
+	}
+}
+
+// eloKWin：A/B 更好时的胜负 Elo 调节强度（替代原 24+4*confidence）。
+func eloKWin() float64 { return 40 }
+
+// eloKDraw：平局公式 K；「都好」略强于「都不好」，二者均弱于明确胜负。
+func eloKDraw(outcome string) float64 {
+	if outcome == "both_bad" {
+		return 14
+	}
+	return 28
+}
+
 func (a *App) vote(c *gin.Context) {
 	var req struct {
-		ItemID          string `json:"itemId"`
-		WinnerSide      string `json:"winnerSide"`
-		ConfidenceScore int    `json:"confidenceScore"`
+		ItemID     string `json:"itemId"`
+		Outcome    string `json:"outcome"`
+		WinnerSide string `json:"winnerSide"`
 	}
 	if !bind(c, &req) {
 		return
 	}
-	if req.ConfidenceScore < 1 || req.ConfidenceScore > 5 {
-		fail(c, http.StatusBadRequest, "confidenceScore 必须在 1-5 之间")
+	outcome, err := parseEvalVoteOutcome(req.Outcome, req.WinnerSide)
+	if err != nil {
+		fail(c, http.StatusBadRequest, err.Error())
 		return
 	}
+	storedScore := voteTierStoredScore(outcome)
 	var item EvalItem
 	if err := a.db.First(&item, "id = ?", req.ItemID).Error; err != nil {
 		fail(c, http.StatusNotFound, "盲评题不存在")
 		return
 	}
-	winnerID := item.LeftAnswerID
-	loserID := item.RightAnswerID
-	if req.WinnerSide == "right" {
-		winnerID, loserID = item.RightAnswerID, item.LeftAnswerID
+	winnerAnswerID := item.LeftAnswerID
+	switch outcome {
+	case "left":
+		winnerAnswerID = item.LeftAnswerID
+	case "right":
+		winnerAnswerID = item.RightAnswerID
+	case "both_good", "both_bad":
+		// 满足非空约束；真实语义由 vote_outcome 表示
+		winnerAnswerID = item.LeftAnswerID
 	}
 	userID := currentUser(c).ID
-	vote := EvalVote{ID: newID(), UserID: userID, SessionID: item.SessionID, ItemID: item.ID, QuestionID: item.QuestionID, WinnerAnswerID: winnerID, ConfidenceScore: req.ConfidenceScore, RatingScale: 5, CreatedAt: time.Now()}
-	err := a.db.Transaction(func(tx *gorm.DB) error {
+	vote := EvalVote{
+		ID:              newID(),
+		UserID:          userID,
+		SessionID:       item.SessionID,
+		ItemID:          item.ID,
+		QuestionID:      item.QuestionID,
+		WinnerAnswerID:  winnerAnswerID,
+		VoteOutcome:     outcome,
+		ConfidenceScore: storedScore,
+		RatingScale:     5,
+		CreatedAt:       time.Now(),
+	}
+	err = a.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&vote).Error; err != nil {
 			return err
 		}
-		return a.updateElo(tx, item.QuestionID, winnerID, loserID, req.ConfidenceScore)
+		switch outcome {
+		case "left":
+			return a.updateEloWin(tx, item.QuestionID, item.LeftAnswerID, item.RightAnswerID, eloKWin())
+		case "right":
+			return a.updateEloWin(tx, item.QuestionID, item.RightAnswerID, item.LeftAnswerID, eloKWin())
+		case "both_good", "both_bad":
+			return a.updateEloDraw(tx, item.QuestionID, item.LeftAnswerID, item.RightAnswerID, eloKDraw(outcome))
+		default:
+			return errors.New("内部错误：未知 outcome")
+		}
 	})
 	if err != nil {
 		fail(c, http.StatusConflict, "该题已投票或统计失败")
@@ -611,7 +700,7 @@ func (a *App) vote(c *gin.Context) {
 	ok(c, vote)
 }
 
-func (a *App) updateElo(tx *gorm.DB, questionID, winnerAnswerID, loserAnswerID string, confidence int) error {
+func (a *App) updateEloWin(tx *gorm.DB, questionID, winnerAnswerID, loserAnswerID string, k float64) error {
 	var question Question
 	var winnerAnswer, loserAnswer ModelAnswer
 	if err := tx.First(&question, "id = ?", questionID).Error; err != nil {
@@ -625,7 +714,6 @@ func (a *App) updateElo(tx *gorm.DB, questionID, winnerAnswerID, loserAnswerID s
 	}
 	winnerStat := getStat(tx, winnerAnswer.ModelID, question.CategoryID)
 	loserStat := getStat(tx, loserAnswer.ModelID, question.CategoryID)
-	k := 24.0 + float64(confidence)*4.0
 	expectedWinner := 1 / (1 + math.Pow(10, (loserStat.EloRating-winnerStat.EloRating)/400))
 	delta := k * (1 - expectedWinner)
 	winnerStat.EloRating += delta
@@ -642,6 +730,44 @@ func (a *App) updateElo(tx *gorm.DB, questionID, winnerAnswerID, loserAnswerID s
 		return err
 	}
 	return tx.Save(&loserStat).Error
+}
+
+// updateEloDraw：平局（都好 / 都不好），双方各记 0.5 分，对称调整 Elo；双方都计入 vote 与 draw。
+func (a *App) updateEloDraw(tx *gorm.DB, questionID, leftAnswerID, rightAnswerID string, k float64) error {
+	var question Question
+	var leftAnswer, rightAnswer ModelAnswer
+	if err := tx.First(&question, "id = ?", questionID).Error; err != nil {
+		return err
+	}
+	if err := tx.First(&leftAnswer, "id = ?", leftAnswerID).Error; err != nil {
+		return err
+	}
+	if err := tx.First(&rightAnswer, "id = ?", rightAnswerID).Error; err != nil {
+		return err
+	}
+	leftStat := getStat(tx, leftAnswer.ModelID, question.CategoryID)
+	rightStat := getStat(tx, rightAnswer.ModelID, question.CategoryID)
+	// 左方期望得分 E_left（对右）
+	eLeft := 1 / (1 + math.Pow(10, (rightStat.EloRating-leftStat.EloRating)/400))
+	deltaLeft := k * (0.5 - eLeft)
+	deltaRight := -deltaLeft
+
+	leftStat.EloRating += deltaLeft
+	leftStat.LastEloDelta = deltaLeft
+	leftStat.VoteCount++
+	leftStat.DrawCount++
+	leftStat.UpdatedAt = time.Now()
+
+	rightStat.EloRating += deltaRight
+	rightStat.LastEloDelta = deltaRight
+	rightStat.VoteCount++
+	rightStat.DrawCount++
+	rightStat.UpdatedAt = time.Now()
+
+	if err := tx.Save(&leftStat).Error; err != nil {
+		return err
+	}
+	return tx.Save(&rightStat).Error
 }
 
 func getStat(tx *gorm.DB, modelID, categoryID string) ModelStat {
