@@ -1,0 +1,53 @@
+{
+  "defaults": {
+    "provider": "zhihu-model-gateway",
+    "baseUrl": "https://model.in.zhihu.com/v1",
+    "apiKeyEnv": "ZHIHU_MODEL_API_KEY",
+    "includeSystemPrompt": true,
+    "timeoutSeconds": 1200
+  },
+  "models": [
+    {
+      "id": "gemini-3p1-pro-preview-20260219-cloudsway",
+      "name": "Gemini 3.1 Pro Preview",
+      "model": "gemini-3p1-pro-preview-20260219-cloudsway",
+      "enabled": false
+    },
+    {
+      "id": "claude-opus-4p7-cloudsway",
+      "name": "Claude Opus 4.7",
+      "model": "claude-opus-4p7-cloudsway",
+      "enabled": false
+    },
+    {
+      "id": "gpt-5-5-2026-04-24",
+      "name": "GPT-5.5",
+      "model": "gpt-5-5-2026-04-24",
+      "enabled": false
+    },
+    {
+      "id": "doubao-seed-2-0-pro",
+      "name": "Doubao Seed 2.0 Pro",
+      "model": "doubao-seed-2-0-pro",
+      "enabled": false
+    },
+    {
+      "id": "glm-5p1-baidubce",
+      "name": "GLM 5.1",
+      "model": "glm-5p1-baidubce",
+      "enabled": false
+    },
+    {
+      "id": "kimi-2-5-baidubce-security",
+      "name": "Kimi 2.5 Security",
+      "model": "kimi-2-5-baidubce-security",
+      "enabled": false
+    },
+    {
+      "id": "deepseek-v4-pro-baidubce",
+      "name": "DeepSeek V4 Pro",
+      "model": "deepseek-v4-pro-baidubce",
+      "enabled": false
+    }
+  ]
+}

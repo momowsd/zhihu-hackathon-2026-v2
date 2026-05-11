@@ -1,0 +1,9 @@
+{
+  "slug": "humor-eval",
+  "name": "搞笑评估",
+  "description": "评估模型在中文幽默表达中的包袱设计、反转、节奏、语境理解和不过度冒犯的分寸感。",
+  "version": "0.1.0",
+  "owners": [],
+  "tags": ["humor", "joke", "creative-writing"],
+  "createdAt": "2026-05-11"
+}

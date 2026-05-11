@@ -36,7 +36,7 @@ function logout() {
     <header class="topbar">
       <RouterLink to="/" class="brand" aria-label="回到首页">
         <span class="brand-mark"></span>
-        <span class="brand-text">LLM Arena</span>
+        <span class="brand-text">看山模型竞技场</span>
       </RouterLink>
       <nav class="top-nav">
         <RouterLink

@@ -1,0 +1,9 @@
+{
+  "slug": "ruozhi-eval",
+  "name": "弱智评估",
+  "description": "收集带有反直觉、脑筋急转弯、常识陷阱或语义歧义的用户 query，用于评估模型是否能识别题目陷阱并给出稳健回答。",
+  "version": "0.1.0",
+  "owners": [],
+  "tags": ["reasoning", "trick-question", "common-sense"],
+  "createdAt": "2026-05-11"
+}

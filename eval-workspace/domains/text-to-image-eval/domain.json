@@ -1,0 +1,9 @@
+{
+  "slug": "text-to-image-eval",
+  "name": "文生图评估",
+  "description": "评估模型将用户图像需求转写为高质量图像生成提示词的能力，包括主体、构图、风格、光影、约束和负面提示的表达。",
+  "version": "0.1.0",
+  "owners": [],
+  "tags": ["text-to-image", "prompt-writing", "visual-design"],
+  "createdAt": "2026-05-11"
+}

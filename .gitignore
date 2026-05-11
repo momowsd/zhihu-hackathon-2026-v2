@@ -7,3 +7,4 @@ data/
 .DS_Store
 .env
 coverage/
+eval-workspace/**/model_calls/models.local.json

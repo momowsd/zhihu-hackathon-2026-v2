@@ -1,0 +1,9 @@
+{
+  "slug": "novel-writing-eval",
+  "name": "小说创作评估",
+  "description": "评估模型在中文小说创作中的叙事张力、人物塑造、世界观一致性、语言风格和情节推进能力。",
+  "version": "0.1.0",
+  "owners": [],
+  "tags": ["creative-writing", "fiction", "narrative"],
+  "createdAt": "2026-05-11"
+}
