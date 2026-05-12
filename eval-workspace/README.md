@@ -45,7 +45,7 @@ responses/
 
 ## 当前领域
 
-- `domains/ruozhi-eval/`：弱智评估
+- `domains/ruozhi-eval/`：弱智吧Case评估
 - `domains/novel-writing-eval/`：小说创作评估
 - `domains/humor-eval/`：搞笑评估
 - `domains/text-to-image-eval/`：文生图评估

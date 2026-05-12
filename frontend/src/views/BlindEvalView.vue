@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Ref } from 'vue'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, useTemplateRef, watch } from 'vue'
 import { api, errorMessage, loadCategories, loadUserHistory, type ApiEnvelope, type Category, type UserHistoryItem } from '../api'
 import { useRoute } from 'vue-router'
 import KanshanMascot from '../components/KanshanMascot.vue'
@@ -53,6 +53,8 @@ const sessionItems = ref<SessionItemRow[]>([])
 const currentIndex = ref(0)
 const error = ref('')
 const route = useRoute()
+const setupCategorySegmentRef = useTemplateRef<HTMLElement>('setupCategorySegment')
+const setupCategoryIndicator = ref({ width: 0, x: 0 })
 
 /** 悬停在某档评分按钮上时，用于两侧卡片边框预览 */
 const ratingHover = ref<VoteOutcome | null>(null)
@@ -61,6 +63,16 @@ const voteSubmitting = ref(false)
 const currentRow = computed(() => sessionItems.value[currentIndex.value] ?? null)
 const selectedCategory = computed(() => categories.value.find((cat) => cat.id === categoryId.value) ?? null)
 const selectedSystemPromptHtml = computed(() => markdownToHtml(selectedCategory.value?.systemPromptMd ?? ''))
+const leftTypedHtml = computed(() => markdownToHtml(leftTyped.value))
+const rightTypedHtml = computed(() => markdownToHtml(rightTyped.value))
+const setupCategoryActiveIndex = computed(() => {
+  const index = categories.value.findIndex((cat) => cat.id === categoryId.value)
+  return index >= 0 ? index : 0
+})
+const setupCategoryIndicatorStyle = computed(() => ({
+  '--setup-seg-indicator-width': `${setupCategoryIndicator.value.width}px`,
+  '--setup-seg-indicator-x': `${setupCategoryIndicator.value.x}px`,
+}))
 
 /** 盲评：先题干打字结束，再两侧回答并行打字（切换题目时取消上一轮） */
 const questionTyped = ref('')
@@ -68,7 +80,7 @@ const leftTyped = ref('')
 const rightTyped = ref('')
 let typewriterRound = 0
 
-const CHAR_MS = 15
+const TYPEWRITER_FRAME_MS = 16
 
 function sleep(ms: number) {
   return new Promise<void>((resolve) => {
@@ -104,12 +116,21 @@ function markdownToHtml(markdown: string) {
       }
       continue
     }
-    if (trimmed.startsWith('- ')) {
+    if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
       if (!listOpen) {
         html.push('<ul>')
         listOpen = true
       }
       html.push(`<li>${inlineMarkdown(trimmed.slice(2))}</li>`)
+      continue
+    }
+    const orderedListMatch = trimmed.match(/^\d+\.\s+(.+)$/)
+    if (orderedListMatch) {
+      if (!listOpen) {
+        html.push('<ul>')
+        listOpen = true
+      }
+      html.push(`<li>${inlineMarkdown(orderedListMatch[1])}</li>`)
       continue
     }
     if (listOpen) {
@@ -125,11 +146,31 @@ function markdownToHtml(markdown: string) {
   return html.join('')
 }
 
-async function streamInto(target: Ref<string>, full: string, round: number) {
-  for (const ch of full) {
+async function updateSetupCategoryIndicator() {
+  await nextTick()
+  const el = setupCategorySegmentRef.value
+  const active = el?.querySelector<HTMLElement>('.battle-setup-seg-btn--active')
+  if (!el || !active) return
+  setupCategoryIndicator.value = { width: active.offsetWidth, x: active.offsetLeft }
+}
+
+function streamChunkSize(full: string, kind: 'question' | 'answer') {
+  const length = Array.from(full).length
+  if (length <= 0) return 1
+  const targetDuration = kind === 'question'
+    ? Math.min(Math.max(length * 18, 420), 1200)
+    : Math.min(Math.max(length * 8, 900), 3600)
+  const frames = Math.max(1, Math.round(targetDuration / TYPEWRITER_FRAME_MS))
+  return Math.max(1, Math.ceil(length / frames))
+}
+
+async function streamInto(target: Ref<string>, full: string, round: number, kind: 'question' | 'answer') {
+  const chars = Array.from(full)
+  const chunkSize = streamChunkSize(full, kind)
+  for (let index = 0; index < chars.length; index += chunkSize) {
     if (round !== typewriterRound) return
-    target.value += ch
-    await sleep(CHAR_MS)
+    target.value += chars.slice(index, index + chunkSize).join('')
+    await sleep(TYPEWRITER_FRAME_MS)
   }
 }
 
@@ -155,12 +196,12 @@ watch(
       return
     }
 
-    await streamInto(questionTyped, row.question.prompt, round)
+    await streamInto(questionTyped, row.question.prompt, round, 'question')
     if (round !== typewriterRound) return
 
     await Promise.all([
-      streamInto(leftTyped, row.left.text, round),
-      streamInto(rightTyped, row.right.text, round),
+      streamInto(leftTyped, row.left.text, round, 'answer'),
+      streamInto(rightTyped, row.right.text, round, 'answer'),
     ])
   },
   { immediate: true },
@@ -333,6 +374,7 @@ function rightCardAccent(): 'none' | 'good' | 'bad' {
 onMounted(async () => {
   categories.value = await loadCategories()
   categoryId.value = categories.value[0]?.id ?? ''
+  await updateSetupCategoryIndicator()
   const arenaId = route.query.arenaSessionId
   if (typeof arenaId === 'string' && arenaId) {
     try {
@@ -342,6 +384,8 @@ onMounted(async () => {
     }
   }
 })
+
+watch([categoryId, categories], updateSetupCategoryIndicator)
 
 async function loadSessionItems(sessionId: string, options: { keepIndex?: boolean } = {}) {
   const previousIndex = currentIndex.value
@@ -471,9 +515,34 @@ const battleHostLine = computed(() => {
     </div>
     <div v-if="!session" class="card battle-setup-card">
       <div class="battle-setup-layout">
-        <KanshanMascot scene="home" size="md" no-sprite-trim />
+        <div class="battle-setup-mascot">
+          <KanshanMascot scene="home" size="md" no-sprite-trim />
+        </div>
         <div class="form battle-setup-form">
-          <label>评估主题<select v-model="categoryId"><option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option></select></label>
+          <div class="battle-setup-controls">
+            <div class="battle-setup-topic">
+              <span class="battle-setup-field-label">评估主题</span>
+              <div
+                ref="setupCategorySegment"
+                class="battle-setup-segmented battle-setup-segmented--measured"
+                aria-label="评估主题"
+                :style="{ ...setupCategoryIndicatorStyle, '--setup-seg-count': categories.length, '--setup-seg-active': setupCategoryActiveIndex }"
+              >
+                <button
+                  v-for="cat in categories"
+                  :key="cat.id"
+                  type="button"
+                  class="battle-setup-seg-btn"
+                  :class="{ 'battle-setup-seg-btn--active': categoryId === cat.id }"
+                  @click="categoryId = cat.id"
+                >
+                  {{ cat.name }}
+                </button>
+              </div>
+            </div>
+            <label class="battle-setup-count">题目数<input v-model.number="count" type="number" min="1" max="20" /></label>
+            <button class="battle-setup-start" @click="start">开始盲评</button>
+          </div>
           <section v-if="selectedCategory" class="system-prompt-card">
             <div class="system-prompt-head">
               <div>
@@ -487,9 +556,7 @@ const battleHostLine = computed(() => {
               当前主题还没有匹配到 `eval-workspace/domains/*/prompts/system.md`，请确认分类 code/name 与评估领域目录已绑定。
             </p>
           </section>
-          <label>题目数<input v-model.number="count" type="number" min="1" max="20" /></label>
           <p v-if="error" class="error">{{ error }}</p>
-          <button @click="start">开始盲评</button>
         </div>
       </div>
     </div>
@@ -621,10 +688,10 @@ const battleHostLine = computed(() => {
             <span class="battle-assistant-label">模型 A</span>
           </div>
           <div class="battle-answer-body">
-            <p :aria-label="currentRow.left.text">
-              <span aria-hidden="true">{{ leftTyped }}</span>
+            <div class="battle-answer-markdown" :aria-label="currentRow.left.text">
+              <div aria-hidden="true" v-html="leftTypedHtml"></div>
               <span v-if="cursorLeft" class="eval-type-cursor" aria-hidden="true">▍</span>
-            </p>
+            </div>
           </div>
         </div>
         <div
@@ -638,10 +705,10 @@ const battleHostLine = computed(() => {
             <span class="battle-assistant-label">模型 B</span>
           </div>
           <div class="battle-answer-body">
-            <p :aria-label="currentRow.right.text">
-              <span aria-hidden="true">{{ rightTyped }}</span>
+            <div class="battle-answer-markdown" :aria-label="currentRow.right.text">
+              <div aria-hidden="true" v-html="rightTypedHtml"></div>
               <span v-if="cursorRight" class="eval-type-cursor" aria-hidden="true">▍</span>
-            </p>
+            </div>
           </div>
         </div>
       </div>
@@ -733,24 +800,151 @@ const battleHostLine = computed(() => {
   gap: 18px;
 }
 
+.battle-setup-mascot {
+  display: flex;
+  justify-content: center;
+  align-self: center;
+}
+
+.battle-setup-form {
+  gap: 10px;
+}
+
+.battle-setup-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  align-items: end;
+}
+
+.battle-setup-controls label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.battle-setup-topic {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.battle-setup-field-label {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.battle-setup-segmented {
+  --setup-seg-gap: 4px;
+  --setup-seg-pad: 4px;
+  --setup-seg-indicator-width: 0px;
+  --setup-seg-indicator-x: 0px;
+  display: inline-flex;
+  position: relative;
+  max-width: 100%;
+  min-height: 40px;
+  gap: var(--setup-seg-gap);
+  padding: var(--setup-seg-pad);
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-solid) 54%, transparent);
+  scrollbar-width: thin;
+}
+
+.battle-setup-segmented::before {
+  content: '';
+  position: absolute;
+  top: var(--setup-seg-pad);
+  bottom: var(--setup-seg-pad);
+  left: var(--setup-seg-pad);
+  width: var(--setup-seg-indicator-width);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--brand-2) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand-2) 38%, var(--border));
+  transform: translateX(calc(var(--setup-seg-indicator-x) - var(--setup-seg-pad)));
+  transition:
+    width 0.22s ease,
+    transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+
+.battle-setup-seg-btn {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  min-width: 0;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 999px;
+  color: var(--text-secondary);
+  background: transparent !important;
+  box-shadow: none !important;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.battle-setup-seg-btn:hover {
+  color: var(--text-primary);
+  transform: none;
+  box-shadow: none;
+}
+
+.battle-setup-seg-btn--active {
+  color: var(--text-primary);
+  transition:
+    color 0.18s ease;
+}
+
+.battle-setup-controls select,
+.battle-setup-controls input,
+.battle-setup-start {
+  min-height: 40px;
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
+
 @media (min-width: 640px) {
   .battle-setup-layout {
     flex-direction: row;
-    align-items: flex-end;
+    align-items: flex-start;
     justify-content: space-between;
-    gap: 24px;
+    gap: 18px;
+  }
+
+  .battle-setup-mascot {
+    flex: 0 0 196px;
+    position: sticky;
+    top: 88px;
   }
 
   .battle-setup-form {
     flex: 1;
     min-width: 0;
   }
+
+  .battle-setup-controls {
+    grid-template-columns: minmax(360px, 1.45fr) 86px minmax(128px, 0.7fr);
+    align-items: end;
+  }
+}
+
+@media (min-width: 640px) and (max-width: 920px) {
+  .battle-setup-controls {
+    grid-template-columns: 112px minmax(140px, 1fr);
+  }
+
+  .battle-setup-topic {
+    grid-column: 1 / -1;
+  }
 }
 
 .system-prompt-card {
-  padding: 14px;
+  padding: 12px;
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: 16px;
   background: color-mix(in srgb, var(--surface-2) 68%, transparent);
 }
 
@@ -759,7 +953,7 @@ const battleHostLine = computed(() => {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .system-prompt-head h3,
@@ -782,7 +976,10 @@ const battleHostLine = computed(() => {
 
 .system-prompt-md {
   color: var(--text-secondary);
-  line-height: 1.65;
+  max-height: 150px;
+  overflow: auto;
+  padding-right: 4px;
+  line-height: 1.55;
   font-size: 13px;
 }
 
@@ -1212,14 +1409,56 @@ const battleHostLine = computed(() => {
 .battle-answer-body {
   flex: 1;
   min-height: 0;
+  max-height: min(52vh, 460px);
+  overflow: auto;
+  padding-right: 4px;
 }
 
-.battle-answer-body p {
-  margin: 0;
+.battle-answer-markdown {
+  min-height: 100%;
   line-height: 1.65;
-  white-space: pre-wrap;
   word-break: break-word;
   font-size: 14px;
+}
+
+.battle-answer-markdown :deep(p),
+.battle-answer-markdown :deep(ul),
+.battle-answer-markdown :deep(h3),
+.battle-answer-markdown :deep(h4) {
+  margin-top: 0;
+}
+
+.battle-answer-markdown :deep(p) {
+  margin: 0;
+  margin-bottom: 0.72em;
+}
+
+.battle-answer-markdown :deep(ul) {
+  margin: 0 0 0.72em;
+  padding-left: 1.2em;
+}
+
+.battle-answer-markdown :deep(li) {
+  margin: 0.2em 0;
+}
+
+.battle-answer-markdown :deep(h3),
+.battle-answer-markdown :deep(h4) {
+  margin-bottom: 0.55em;
+  color: var(--text);
+  line-height: 1.35;
+}
+
+.battle-answer-markdown :deep(strong) {
+  color: var(--text);
+  font-weight: 800;
+}
+
+.battle-answer-markdown :deep(code) {
+  padding: 0.08em 0.32em;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--surface-2) 86%, transparent);
+  color: var(--brand-2);
 }
 
 .answer-card--accent-good {

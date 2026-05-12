@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, useTemplateRef, watch } from 'vue'
-import { api, loadCategories, type ApiEnvelope, type Category } from '../api'
+import { api, loadCategories, loadPeerMatrix, type ApiEnvelope, type Category, type PeerMatrixResponse } from '../api'
 import {
   arenaCreativeWritingRows,
   arenaOverallRows,
@@ -26,6 +26,7 @@ type AbilityScope = 'platform' | 'all'
 const categories = ref<Category[]>([])
 const categoryId = ref('')
 const rows = ref<RankRow[]>([])
+const peerMatrix = ref<PeerMatrixResponse>({ models: [], cells: [], sampleCount: 0 })
 const activeTab = ref<RankingTab>('kanshan')
 const abilityLeaderboard = ref<AbilityLeaderboard>('overall')
 const abilityScope = ref<AbilityScope>('platform')
@@ -254,6 +255,48 @@ const summaryStats = computed(() => {
   }
 })
 
+const peerMatrixModels = computed(() => peerMatrix.value.models)
+const peerMatrixCellMap = computed(() => {
+  const map = new Map<string, PeerMatrixResponse['cells'][number]>()
+  for (const cell of peerMatrix.value.cells) {
+    map.set(`${cell.judgeModelId}:${cell.targetModelId}`, cell)
+  }
+  return map
+})
+
+function peerCell(judgeModelId: string, targetModelId: string) {
+  return peerMatrixCellMap.value.get(`${judgeModelId}:${targetModelId}`) ?? null
+}
+
+function peerCellStyle(judgeModelId: string, targetModelId: string) {
+  if (judgeModelId === targetModelId) {
+    return { '--heat-positive': '0%', '--heat-negative': '0%' }
+  }
+  const cell = peerCell(judgeModelId, targetModelId)
+  const score = cell?.samples ? Math.max(-1, Math.min(1, cell.score)) : 0
+  const strength = cell?.samples ? 18 + Math.abs(score) * 42 : 0
+  return {
+    '--heat-positive': score > 0 ? `${strength.toFixed(1)}%` : '0%',
+    '--heat-negative': score < 0 ? `${strength.toFixed(1)}%` : '0%',
+  }
+}
+
+function peerCellLabel(judgeModelId: string, targetModelId: string) {
+  if (judgeModelId === targetModelId) return '—'
+  const cell = peerCell(judgeModelId, targetModelId)
+  if (!cell?.samples) return '--'
+  return cell.score.toFixed(2)
+}
+
+function peerCellTitle(judgeModelId: string, targetModelId: string) {
+  const judge = peerMatrixModels.value.find((model) => model.modelId === judgeModelId)?.displayName ?? judgeModelId
+  const target = peerMatrixModels.value.find((model) => model.modelId === targetModelId)?.displayName ?? targetModelId
+  const cell = peerCell(judgeModelId, targetModelId)
+  if (judgeModelId === targetModelId) return `${judge} 自评不计入`
+  if (!cell?.samples) return `${judge} 对 ${target} 暂无互评样本`
+  return `${judge} 对 ${target}: ${cell.score.toFixed(2)} · ${cell.samples} 样本 · 正向 ${cell.positive} / 负向 ${cell.negative} / 都好 ${cell.bothGood} / 都不好 ${cell.bothBad}`
+}
+
 const abilitySourceRows = computed(() =>
   abilityLeaderboard.value === 'overall' ? arenaOverallRows : arenaCreativeWritingRows,
 )
@@ -374,13 +417,20 @@ async function load() {
   rows.value = response.data.data ?? []
 }
 
+async function loadPeerMatrixData() {
+  peerMatrix.value = await loadPeerMatrix(categoryId.value)
+}
+
 onMounted(async () => {
   categories.value = await loadCategories()
-  await load()
+  await Promise.all([load(), loadPeerMatrixData()])
   await updateCategoryIndicator()
 })
 
-watch(categoryId, load)
+watch(categoryId, () => {
+  void load()
+  void loadPeerMatrixData()
+})
 watch([categoryId, categories], updateCategoryIndicator)
 </script>
 
@@ -801,6 +851,45 @@ watch([categoryId, categories], updateCategoryIndicator)
         </div>
       </section>
     </div>
+
+    <section v-if="activeTab === 'kanshan'" class="card peer-heatmap-card">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">MODEL PEER EVALS</p>
+          <h2>模型互评热力图</h2>
+          <p class="muted">行是裁判模型，列是被评价模型；分数越高代表越偏好该模型，越低代表越不偏好。</p>
+        </div>
+        <span class="muted">冷启样本 {{ peerMatrix.sampleCount }}</span>
+      </div>
+      <div v-if="peerMatrixModels.length" class="peer-heatmap-shell">
+        <div
+          class="peer-heatmap-grid"
+          :style="{ gridTemplateColumns: `132px repeat(${peerMatrixModels.length}, minmax(112px, 1fr))` }"
+          role="grid"
+          aria-label="模型互评热力图"
+        >
+          <div class="peer-heatmap-corner" aria-hidden="true">Judge \ Target</div>
+          <div v-for="model in peerMatrixModels" :key="`col-${model.modelId}`" class="peer-heatmap-axis peer-heatmap-axis--col">
+            {{ model.displayName }}
+          </div>
+          <template v-for="judge in peerMatrixModels" :key="`row-${judge.modelId}`">
+            <div class="peer-heatmap-axis peer-heatmap-axis--row">{{ judge.displayName }}</div>
+            <div
+              v-for="target in peerMatrixModels"
+              :key="`${judge.modelId}-${target.modelId}`"
+              class="peer-heatmap-cell"
+              :class="{ 'peer-heatmap-cell--self': judge.modelId === target.modelId, 'peer-heatmap-cell--empty': !peerCell(judge.modelId, target.modelId)?.samples }"
+              :style="peerCellStyle(judge.modelId, target.modelId)"
+              :title="peerCellTitle(judge.modelId, target.modelId)"
+              role="gridcell"
+            >
+              {{ peerCellLabel(judge.modelId, target.modelId) }}
+            </div>
+          </template>
+        </div>
+      </div>
+      <p v-else class="muted empty-state">暂无模型互评样本。生成并放置 `eval-workspace/model-peer-evals/peer_votes.jsonl` 后，服务启动会自动导入。</p>
+    </section>
 
     <section v-if="activeTab === 'kanshan' && rankedRows.length" class="card price-performance-card">
       <div class="section-head">
@@ -1262,6 +1351,102 @@ watch([categoryId, categories], updateCategoryIndicator)
     radial-gradient(circle, var(--surface) 0 55%, transparent 56%),
     conic-gradient(var(--brand-2) var(--ring), color-mix(in srgb, var(--surface-2) 70%, transparent) 0);
   border: 1px solid var(--border);
+}
+
+.peer-heatmap-card {
+  margin-bottom: 16px;
+}
+
+.peer-heatmap-card .section-head {
+  align-items: flex-start;
+}
+
+.peer-heatmap-card .section-head p.muted {
+  max-width: 720px;
+  margin: 6px 0 0;
+}
+
+.peer-heatmap-shell {
+  overflow: auto;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background:
+    linear-gradient(color-mix(in srgb, var(--surface) 82%, transparent), color-mix(in srgb, var(--surface) 82%, transparent)),
+    repeating-linear-gradient(90deg, color-mix(in srgb, var(--border) 42%, transparent) 0 1px, transparent 1px 68px),
+    repeating-linear-gradient(0deg, color-mix(in srgb, var(--border) 36%, transparent) 0 1px, transparent 1px 48px);
+}
+
+.peer-heatmap-grid {
+  display: grid;
+  min-width: 920px;
+}
+
+.peer-heatmap-corner,
+.peer-heatmap-axis,
+.peer-heatmap-cell {
+  min-height: 46px;
+  display: grid;
+  place-items: center;
+  padding: 8px;
+  border-right: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.peer-heatmap-corner,
+.peer-heatmap-axis {
+  position: sticky;
+  z-index: 2;
+  background: color-mix(in srgb, var(--surface-solid) 92%, transparent);
+  color: var(--text-secondary);
+  font-weight: 800;
+}
+
+.peer-heatmap-corner {
+  left: 0;
+  top: 0;
+  z-index: 4;
+}
+
+.peer-heatmap-axis--col {
+  top: 0;
+  text-align: center;
+  line-height: 1.25;
+  word-break: normal;
+}
+
+.peer-heatmap-axis--row {
+  left: 0;
+  justify-items: start;
+  text-align: left;
+  line-height: 1.25;
+}
+
+.peer-heatmap-cell {
+  --heat-positive: 0%;
+  --heat-negative: 0%;
+  color: var(--text-primary);
+  font-weight: 800;
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--brand-2) var(--heat-positive), transparent),
+      color-mix(in srgb, var(--danger) var(--heat-negative), transparent)
+    ),
+    color-mix(in srgb, var(--surface-2) 64%, transparent);
+}
+
+.peer-heatmap-cell--empty {
+  color: var(--text-secondary);
+  font-weight: 650;
+}
+
+.peer-heatmap-cell--self {
+  color: color-mix(in srgb, var(--text-secondary) 72%, transparent);
+  background:
+    repeating-linear-gradient(135deg, color-mix(in srgb, var(--border) 40%, transparent) 0 6px, transparent 6px 12px),
+    color-mix(in srgb, var(--surface-2) 58%, transparent);
 }
 
 .price-performance-card {

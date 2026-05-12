@@ -29,12 +29,17 @@ function primaryAction() {
     <div class="hero-card">
       <div class="hero-layout">
         <div class="hero-copy">
-          <div class="eyebrow">LLM Blind Evaluation Arena · 刘看山在场</div>
-          <h1>用真实用户偏好，比较大模型回答效果。</h1>
+          <div class="eyebrow">LLM Blind Evaluation Arena · 看山模型竞技场</div>
+          <h1>
+            <span class="hero-quote-line">
+              <span>有问题，就会有答案；有模型，就会有江湖。</span>
+            </span>
+            <span class="hero-title-line">和看山队长一起，评出模型的真本事。</span>
+          </h1>
           <p>
             这是一个面向 hackathon 的大模型盲评与打榜站点：用户在不知道模型身份的情况下比较回答，
             系统用 Elo 聚合胜负结果，让“哪个模型更会回答”变成可观察、可讨论、可迭代的数据。
-            知乎 IP「刘看山」会在首页与 Battle 里陪你读题、选档；首屏用循环短片呈现形象，Battle 里仍可点点他听一句主持词。
+            知乎 IP「刘看山」会在首页与 Battle 里陪你读题、选档。
           </p>
           <div class="hero-actions">
             <button @click="primaryAction">{{ getAccessToken() ? '进入 Dashboard' : '登录开始盲评' }}</button>
@@ -75,7 +80,7 @@ function primaryAction() {
       <div class="feature-card">
         <span class="feature-kicker">玩法 1</span>
         <h3>主题化 1 vs 1 盲评</h3>
-        <p>按“弱智评估”“八卦评估”“角色扮演”“搞笑程度”等主题随机抽题，匿名比较主流模型回答。</p>
+        <p>按“弱智吧分析”“高情商回复”“小说创作”“短剧剧本生成”等主题随机抽题，匿名比较主流模型回答。</p>
       </div>
       <div class="feature-card">
         <span class="feature-kicker">玩法 2</span>

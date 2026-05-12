@@ -15,6 +15,22 @@ export type Category = {
 export type Question = { id: string; categoryId: string; prompt: string; source: string; difficulty: string; enabled: boolean }
 export type Model = { id: string; provider: string; name: string; displayName: string; version: string; isBaseline: boolean; enabled: boolean }
 export type ModelAnswer = { id: string; questionId: string; modelId: string; answerText: string; metadataJson: string }
+export type PeerMatrixModel = { modelId: string; displayName: string; provider: string }
+export type PeerMatrixCell = {
+  judgeModelId: string
+  targetModelId: string
+  score: number
+  samples: number
+  positive: number
+  negative: number
+  bothGood: number
+  bothBad: number
+}
+export type PeerMatrixResponse = {
+  models: PeerMatrixModel[]
+  cells: PeerMatrixCell[]
+  sampleCount: number
+}
 export type UserHistoryItem = {
   sessionId: string
   sessionMode: string
@@ -113,6 +129,13 @@ export async function adminBrowseTable(table: string, page: number, pageSize: nu
   return response.data.data
 }
 
+export async function loadPeerMatrix(categoryId?: string) {
+  const response = await api.get<ApiEnvelope<PeerMatrixResponse>>('/rankings/peer-matrix', {
+    params: { categoryId: categoryId || undefined },
+  })
+  return response.data.data
+}
+
 export type QuestionDeleteImpact = {
   votes: number
   evalItems: number
@@ -181,9 +204,16 @@ export async function exchangeZhihuOAuthTicket(ticket: string) {
   saveTokens(response.data.data.accessToken, response.data.data.refreshToken)
 }
 
+function normalizeCategory(category: Category): Category {
+  if (category.domainSlug === 'ruozhi-eval' || category.code === 'ruozhi-eval' || category.name === '弱智评估') {
+    return { ...category, name: '弱智吧Case评估' }
+  }
+  return category
+}
+
 export async function loadCategories() {
   const response = await api.get<ApiEnvelope<Category[]>>('/eval/categories')
-  return response.data.data
+  return response.data.data.map(normalizeCategory)
 }
 
 export async function loadUserHistory(page = 1, pageSize = 10) {

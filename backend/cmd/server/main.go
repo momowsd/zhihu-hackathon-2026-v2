@@ -200,6 +200,37 @@ type EvalVote struct {
 
 func (EvalVote) TableName() string { return "eval_votes" }
 
+type ModelPeerVote struct {
+	ID            string    `gorm:"primaryKey;size:36" json:"id"`
+	SourceID      string    `gorm:"uniqueIndex;size:128;not null" json:"sourceId"`
+	RunID         string    `gorm:"index;size:128" json:"runId"`
+	Domain        string    `gorm:"index;size:128;not null" json:"domain"`
+	CategoryID    string    `gorm:"index;size:36;not null" json:"categoryId"`
+	QueryID       string    `gorm:"size:64;not null" json:"queryId"`
+	QuestionID    string    `gorm:"index;size:36;not null" json:"questionId"`
+	JudgeModelID  string    `gorm:"index;size:36;not null" json:"judgeModelId"`
+	LeftModelID   string    `gorm:"index;size:36;not null" json:"leftModelId"`
+	RightModelID  string    `gorm:"index;size:36;not null" json:"rightModelId"`
+	LeftAnswerID  string    `gorm:"size:36" json:"leftAnswerId"`
+	RightAnswerID string    `gorm:"size:36" json:"rightAnswerId"`
+	Outcome       string    `gorm:"size:24;not null" json:"outcome"`
+	Score         float64   `gorm:"not null;default:0" json:"score"`
+	Confidence    float64   `gorm:"not null;default:0" json:"confidence"`
+	Reason        string    `gorm:"type:text" json:"reason"`
+	Seed          int64     `gorm:"not null;default:0" json:"seed"`
+	Source        string    `gorm:"size:128;not null;default:model-peer-evals" json:"source"`
+	Applied       bool      `gorm:"not null;default:false" json:"applied"`
+	EffectJSON    string    `gorm:"type:text;not null;default:''" json:"effectJson"`
+	CreatedAt     time.Time `gorm:"not null" json:"createdAt"`
+}
+
+func (ModelPeerVote) TableName() string { return "model_peer_votes" }
+
+type dashboardTrendPoint struct {
+	Date  string `json:"date"`
+	Count int64  `json:"count"`
+}
+
 type voteModelEffect struct {
 	Side       string  `json:"side"`
 	ModelID    string  `json:"modelId"`
@@ -279,7 +310,7 @@ func main() {
 }
 
 func migrateAndSeed(db *gorm.DB) error {
-	if err := db.AutoMigrate(&User{}, &EvalCategory{}, &Question{}, &Model{}, &ModelAnswer{}, &EvalSession{}, &EvalItem{}, &EvalVote{}, &ModelStat{}, &SubmittedEndpoint{}); err != nil {
+	if err := db.AutoMigrate(&User{}, &EvalCategory{}, &Question{}, &Model{}, &ModelAnswer{}, &EvalSession{}, &EvalItem{}, &EvalVote{}, &ModelPeerVote{}, &ModelStat{}, &SubmittedEndpoint{}); err != nil {
 		return err
 	}
 	// SQLite forbids ADD COLUMN … UNIQUE; apply uniqueness with a standalone index after the column exists.
@@ -300,21 +331,21 @@ func migrateAndSeed(db *gorm.DB) error {
 			return err
 		}
 	}
+	if err := ensureDefaultModels(db); err != nil {
+		return err
+	}
 	db.Model(&EvalCategory{}).Count(&count)
 	if count > 0 {
 		return syncEvalWorkspaceDomains(db)
 	}
-	now := time.Now()
-	cats := []EvalCategory{
-		{ID: newID(), Code: "ruozhi-eval", Name: "弱智评估", Description: "测试模型对反常识、脑筋急转弯和陷阱问题的稳定性。", Enabled: true, SortOrder: 1},
-		{ID: newID(), Code: "novel-writing-eval", Name: "小说创作评估", Description: "评估模型在中文小说创作中的叙事张力、人物塑造、世界观一致性、语言风格和情节推进能力。", Enabled: true, SortOrder: 2},
-		{ID: newID(), Code: "movie-script-eval", Name: "短剧脚本生成", Description: "评估模型在短剧脚本、大纲、强情节反转、人物冲突和商业短剧节奏上的生成能力。", Enabled: true, SortOrder: 3},
-		{ID: newID(), Code: "emotion-eval", Name: "高情商回复", Description: "评估模型在亲密关系、社交沟通和冲突缓和场景中的共情、边界感、表达分寸与回复质量。", Enabled: true, SortOrder: 4},
+	if len(loadEvalDomainMetas()) > 0 {
+		return syncEvalWorkspaceDomains(db)
 	}
-	if err := db.Create(&cats).Error; err != nil {
-		return err
-	}
-	models := []Model{
+	return nil
+}
+
+func defaultModels() []Model {
+	return []Model{
 		{ID: newID(), Provider: "google", Name: "gemini-3p1-pro-preview-20260219-cloudsway", DisplayName: "Gemini 3.1 Pro Preview", Version: "zhihu-gateway", IsBaseline: true, Enabled: true},
 		{ID: newID(), Provider: "anthropic", Name: "claude-opus-4p7-cloudsway", DisplayName: "Claude Opus 4.7", Version: "zhihu-gateway", IsBaseline: true, Enabled: true},
 		{ID: newID(), Provider: "openai", Name: "gpt-5-5-2026-04-24", DisplayName: "GPT-5.5", Version: "zhihu-gateway", IsBaseline: true, Enabled: true},
@@ -323,54 +354,29 @@ func migrateAndSeed(db *gorm.DB) error {
 		{ID: newID(), Provider: "moonshot", Name: "kimi-2-5-baidubce-security", DisplayName: "Kimi 2.5", Version: "zhihu-gateway", IsBaseline: true, Enabled: true},
 		{ID: newID(), Provider: "deepseek", Name: "deepseek-v4-pro-baidubce", DisplayName: "DeepSeek V4 Pro", Version: "zhihu-gateway", IsBaseline: true, Enabled: true},
 	}
-	if err := db.Create(&models).Error; err != nil {
-		return err
-	}
-	questionsByCat := map[string][]string{
-		cats[0].ID: {
-			"如果一只猫每小时吃 2 条鱼，为什么它三小时后还说自己饿？",
-			"请解释为什么 1+1 在某些语境下不一定等于 2。",
-			"一个人把伞带进室内却没有淋湿，最可能发生了什么？",
-			"为什么说「明天一定早睡」是最常见的谎言之一？",
-			"如果重力突然减半一天，最先倒霉的是哪种职业？",
-		},
-		cats[1].ID: {
-			"如何以“我从修仙界摆烂，修炼走火入魔后，穿越回到了我刚毕业那年……”为开头，创作一个轻松幽默的故事？",
-			"可以以“我从未想过结局会是这样”为开头写一篇文章吗?",
-			"文笔挑战:以「碎玻璃」「影子」「沉默」为关键词，写一段文字，你会怎么写？",
-			"如何以“系统提示：宿主，您是本世界最后一个普通人”开头，写一个故事？",
-			"以“2077年，人类终于发明了时间机器。但第一个测试员回来时，只带回一句话：别启动它。”写一篇小说？",
-		},
-		cats[2].ID: {
-			"写一段短剧脚本大纲：场景是外卖员送餐到顶级别墅，开门的竟然是十年前因贫穷甩掉他的前女友。",
-			"写一段短剧脚本大纲：场景是一名职业小偷潜入一户人家，却发现这家人正在庆祝“欢迎神偷归来”。",
-			"写一段短剧脚本大纲：场景是人类发明了能预测死期的机器，乞丐捡到一部机器发现上面显示自己还能活 500 年。",
-			"写一段短剧脚本大纲：场景是面试官在面试一名应聘者，应聘者不小心把文件夹里的“遗书”当成简历递了过去。",
-			"写一段短剧脚本大纲：场景是一名特工在执行任务时，发现目标人物竟然是未来的自己，两人在窄巷相遇。",
-		},
-		cats[3].ID: {
-			"女朋友突然说：“你现在对我越来越敷衍了。”请高情商回复。",
-			"你喜欢的人说：“我感觉我们更适合做朋友。”请高情商回复。",
-			"对方连续很久不回消息后突然出现：“最近太忙了。”请高情商回复。",
-			"女朋友问：“如果我变丑了你还会喜欢我吗？”请高情商回复。",
-			"暧昧对象突然说：“你是不是对所有人都这么会聊天？”请高情商回复。",
-		},
-	}
-	for _, cat := range cats {
-		for _, prompt := range questionsByCat[cat.ID] {
-			q := Question{ID: newID(), CategoryID: cat.ID, Prompt: prompt, Source: "seed", Difficulty: "normal", Enabled: true, CreatedAt: now}
-			if err := db.Create(&q).Error; err != nil {
+}
+
+func ensureDefaultModels(db *gorm.DB) error {
+	for _, model := range defaultModels() {
+		var existing Model
+		if err := db.First(&existing, "name = ?", model.Name).Error; err == nil {
+			updates := map[string]any{
+				"provider":     model.Provider,
+				"display_name": model.DisplayName,
+				"version":      model.Version,
+				"is_baseline":  true,
+				"enabled":      true,
+			}
+			if err := db.Model(&Model{}).Where("id = ?", existing.ID).Updates(updates).Error; err != nil {
 				return err
 			}
-			for i, model := range models {
-				answer := seedAnswer(cat.Name, prompt, model.DisplayName, i)
-				if err := db.Create(&ModelAnswer{ID: newID(), QuestionID: q.ID, ModelID: model.ID, AnswerText: answer, MetadataJSON: `{"seed":true}`, CreatedAt: now}).Error; err != nil {
-					return err
-				}
-			}
+			continue
+		}
+		if err := db.Create(&model).Error; err != nil {
+			return err
 		}
 	}
-	return syncEvalWorkspaceDomains(db)
+	return nil
 }
 
 func seedAnswer(category, prompt, model string, variant int) string {
@@ -403,6 +409,7 @@ func (a *App) router() *gin.Engine {
 	eval.GET("/sessions/:id/items", a.listSessionItems)
 	eval.GET("/sessions/:id/next", a.nextItem)
 	eval.POST("/votes", a.vote)
+	api.GET("/rankings/peer-matrix", a.rankingPeerMatrix)
 	api.GET("/rankings", a.rankings)
 	api.GET("/dashboard/summary", a.dashboard)
 	arena := api.Group("/arena", a.authRequired())
@@ -431,11 +438,12 @@ func (a *App) router() *gin.Engine {
 }
 
 type evalDomainMeta struct {
-	Slug         string
-	Name         string
-	Description  string
-	SystemPrompt string
-	RawQueries   []string
+	Slug            string
+	Name            string
+	Description     string
+	SystemPrompt    string
+	RawQueries      []evalRawQuery
+	ResponseAnswers map[string]map[string]evalResponseJSON
 }
 
 type evalDomainJSON struct {
@@ -445,16 +453,81 @@ type evalDomainJSON struct {
 }
 
 type rawQueryJSON struct {
+	ID    string `json:"id"`
 	Query string `json:"query"`
 }
 
+type evalRawQuery struct {
+	ID    string
+	Query string
+}
+
+type evalResponseJSON struct {
+	QueryID  string `json:"queryId"`
+	ModelID  string `json:"modelId"`
+	Model    string `json:"model"`
+	Provider string `json:"provider"`
+	BaseURL  string `json:"baseUrl"`
+	CalledAt string `json:"calledAt"`
+	Answer   string `json:"answer"`
+	Error    any    `json:"error"`
+}
+
+type peerVoteSideJSON struct {
+	ModelID string `json:"modelId"`
+}
+
+type peerVoteFileRow struct {
+	ID            string            `json:"id"`
+	SchemaVersion int               `json:"schemaVersion"`
+	RunID         string            `json:"runId"`
+	Domain        string            `json:"domain"`
+	QueryID       string            `json:"queryId"`
+	QuestionID    string            `json:"questionId"`
+	JudgeModel    string            `json:"judgeModel"`
+	LeftModel     string            `json:"leftModel"`
+	RightModel    string            `json:"rightModel"`
+	Left          peerVoteSideJSON  `json:"left"`
+	Right         peerVoteSideJSON  `json:"right"`
+	Outcome       string            `json:"outcome"`
+	Score         *float64          `json:"score"`
+	Confidence    *float64          `json:"confidence"`
+	Reason        string            `json:"reason"`
+	Seed          int64             `json:"seed"`
+	Metadata      map[string]string `json:"metadata"`
+}
+
 func evalWorkspaceRoot() string {
+	if root := strings.TrimSpace(os.Getenv("EVAL_WORKSPACE_DOMAINS")); root != "" {
+		if info, err := os.Stat(root); err == nil && info.IsDir() {
+			return root
+		}
+	}
 	for _, root := range []string{"eval-workspace/domains", "../eval-workspace/domains"} {
 		if info, err := os.Stat(root); err == nil && info.IsDir() {
 			return root
 		}
 	}
 	return "eval-workspace/domains"
+}
+
+func modelPeerEvalRoot() string {
+	if root := strings.TrimSpace(os.Getenv("EVAL_MODEL_PEER_EVALS")); root != "" {
+		if info, err := os.Stat(root); err == nil && info.IsDir() {
+			return root
+		}
+	}
+	domainRoot := evalWorkspaceRoot()
+	for _, root := range []string{
+		filepath.Join(filepath.Dir(domainRoot), "model-peer-evals"),
+		"eval-workspace/model-peer-evals",
+		"../eval-workspace/model-peer-evals",
+	} {
+		if info, err := os.Stat(root); err == nil && info.IsDir() {
+			return root
+		}
+	}
+	return filepath.Join(filepath.Dir(domainRoot), "model-peer-evals")
 }
 
 func preferredEvalDomainOrder() []string {
@@ -466,6 +539,7 @@ func evalDomainAliases() map[string]string {
 		"ruozhi-eval":        "ruozhi-eval",
 		"silly":              "ruozhi-eval",
 		"弱智评估":               "ruozhi-eval",
+		"弱智吧Case评估":          "ruozhi-eval",
 		"novel-writing-eval": "novel-writing-eval",
 		"novel":              "novel-writing-eval",
 		"小说创作评估":             "novel-writing-eval",
@@ -495,14 +569,14 @@ func readEvalDomainPrompt(slug string) string {
 	return string(content)
 }
 
-func readRawQueries(slug string) []string {
+func readRawQueries(slug string) []evalRawQuery {
 	content, err := os.ReadFile(filepath.Join(evalWorkspaceRoot(), slug, "raw_queries.jsonl"))
 	if err != nil {
 		return nil
 	}
-	var queries []string
+	var queries []evalRawQuery
 	seen := map[string]bool{}
-	for _, line := range strings.Split(string(content), "\n") {
+	for idx, line := range strings.Split(string(content), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
@@ -515,10 +589,64 @@ func readRawQueries(slug string) []string {
 		if query == "" || seen[query] {
 			continue
 		}
+		queryID := strings.TrimSpace(row.ID)
+		if queryID == "" {
+			queryID = fmt.Sprintf("rq-%04d", idx+1)
+		}
 		seen[query] = true
-		queries = append(queries, query)
+		queries = append(queries, evalRawQuery{ID: queryID, Query: query})
 	}
 	return queries
+}
+
+func readEvalResponses(slug string) map[string]map[string]evalResponseJSON {
+	dir := filepath.Join(evalWorkspaceRoot(), slug, "responses")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+	out := map[string]map[string]evalResponseJSON{}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".jsonl") {
+			continue
+		}
+		defaultModelID := strings.TrimSuffix(entry.Name(), ".jsonl")
+		content, err := os.ReadFile(filepath.Join(dir, entry.Name()))
+		if err != nil {
+			continue
+		}
+		for _, line := range strings.Split(string(content), "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			var row evalResponseJSON
+			if err := json.Unmarshal([]byte(line), &row); err != nil {
+				continue
+			}
+			if row.Error != nil || strings.TrimSpace(row.Answer) == "" {
+				continue
+			}
+			queryID := strings.TrimSpace(row.QueryID)
+			if queryID == "" {
+				continue
+			}
+			modelID := strings.TrimSpace(row.ModelID)
+			if modelID == "" {
+				modelID = strings.TrimSpace(row.Model)
+			}
+			if modelID == "" {
+				modelID = defaultModelID
+			}
+			row.ModelID = modelID
+			row.Answer = strings.TrimSpace(row.Answer)
+			if out[queryID] == nil {
+				out[queryID] = map[string]evalResponseJSON{}
+			}
+			out[queryID][modelID] = row
+		}
+	}
+	return out
 }
 
 func loadEvalDomainMetas() []evalDomainMeta {
@@ -538,11 +666,12 @@ func loadEvalDomainMetas() []evalDomainMeta {
 			meta.Slug = slug
 		}
 		out = append(out, evalDomainMeta{
-			Slug:         meta.Slug,
-			Name:         meta.Name,
-			Description:  meta.Description,
-			SystemPrompt: readEvalDomainPrompt(slug),
-			RawQueries:   readRawQueries(slug),
+			Slug:            meta.Slug,
+			Name:            meta.Name,
+			Description:     meta.Description,
+			SystemPrompt:    readEvalDomainPrompt(slug),
+			RawQueries:      readRawQueries(slug),
+			ResponseAnswers: readEvalResponses(slug),
 		})
 	}
 	return out
@@ -569,9 +698,17 @@ func syncEvalWorkspaceDomains(db *gorm.DB) error {
 	if len(domains) == 0 {
 		return nil
 	}
+	if err := ensureDefaultModels(db); err != nil {
+		return err
+	}
 	var models []Model
 	if err := db.Where("enabled = ?", true).Find(&models).Error; err != nil {
 		return err
+	}
+	modelByName := map[string]Model{}
+	for _, model := range models {
+		modelByName[strings.TrimSpace(model.Name)] = model
+		modelByName[strings.TrimSpace(model.ID)] = model
 	}
 	activeCodes := make([]string, 0, len(domains))
 	now := time.Now()
@@ -596,39 +733,374 @@ func syncEvalWorkspaceDomains(db *gorm.DB) error {
 		cat.Code = domain.Slug
 		cat.Name = domain.Name
 		activeCodes = append(activeCodes, domain.Slug)
-		for _, prompt := range domain.RawQueries {
+		for _, model := range models {
+			var stat ModelStat
+			if err := db.First(&stat, "model_id = ? AND category_id = ?", model.ID, cat.ID).Error; err == nil {
+				continue
+			}
+			stat = ModelStat{ModelID: model.ID, CategoryID: cat.ID, EloRating: defaultElo, UpdatedAt: now}
+			if err := db.Create(&stat).Error; err != nil {
+				return err
+			}
+		}
+		for _, raw := range domain.RawQueries {
+			prompt := raw.Query
 			var q Question
 			if err := db.First(&q, "category_id = ? AND prompt = ?", cat.ID, prompt).Error; err != nil {
 				q = Question{ID: newID(), CategoryID: cat.ID, Prompt: prompt, Source: "eval-workspace", Difficulty: "normal", Enabled: true, CreatedAt: now}
 				if err := db.Create(&q).Error; err != nil {
 					return err
 				}
-			}
-			for i, model := range models {
-				var answerCount int64
-				if err := db.Model(&ModelAnswer{}).Where("question_id = ? AND model_id = ?", q.ID, model.ID).Count(&answerCount).Error; err != nil {
+			} else if !q.Enabled || q.Source != "eval-workspace" {
+				if err := db.Model(&Question{}).Where("id = ?", q.ID).Updates(map[string]any{"source": "eval-workspace", "enabled": true}).Error; err != nil {
 					return err
 				}
-				if answerCount > 0 {
+			}
+			for modelKey, response := range domain.ResponseAnswers[raw.ID] {
+				model, ok := modelByName[strings.TrimSpace(modelKey)]
+				if !ok {
 					continue
 				}
-				answer := seedAnswer(domain.Name, prompt, model.DisplayName, i)
-				if err := db.Create(&ModelAnswer{ID: newID(), QuestionID: q.ID, ModelID: model.ID, AnswerText: answer, MetadataJSON: `{"seed":true,"source":"eval-workspace"}`, CreatedAt: now}).Error; err != nil {
+				metadata := map[string]any{
+					"source":   "eval-workspace-response",
+					"domain":   domain.Slug,
+					"queryId":  raw.ID,
+					"modelId":  response.ModelID,
+					"provider": response.Provider,
+					"baseUrl":  response.BaseURL,
+					"calledAt": response.CalledAt,
+				}
+				metadataJSON, _ := json.Marshal(metadata)
+				var existing ModelAnswer
+				if err := db.First(&existing, "question_id = ? AND model_id = ?", q.ID, model.ID).Error; err == nil {
+					if err := db.Model(&ModelAnswer{}).Where("id = ?", existing.ID).Updates(map[string]any{
+						"answer_text":   response.Answer,
+						"metadata_json": string(metadataJSON),
+					}).Error; err != nil {
+						return err
+					}
+					continue
+				}
+				if err := db.Create(&ModelAnswer{
+					ID:           newID(),
+					QuestionID:   q.ID,
+					ModelID:      model.ID,
+					AnswerText:   response.Answer,
+					MetadataJSON: string(metadataJSON),
+					CreatedAt:    now,
+				}).Error; err != nil {
 					return err
 				}
 			}
 		}
 	}
-	return db.Model(&EvalCategory{}).Where("code NOT IN ?", activeCodes).Updates(map[string]any{"enabled": false}).Error
+	if err := db.Model(&EvalCategory{}).Where("code NOT IN ?", activeCodes).Updates(map[string]any{"enabled": false}).Error; err != nil {
+		return err
+	}
+	return syncModelPeerVotes(db, domains)
+}
+
+func peerVoteScore(outcome string) float64 {
+	switch outcome {
+	case "left":
+		return 1
+	case "right":
+		return -1
+	case "both_good":
+		return 0.35
+	case "both_bad":
+		return 0
+	default:
+		return 0
+	}
+}
+
+func peerTargetScore(outcome string, targetIsLeft bool) float64 {
+	switch outcome {
+	case "left":
+		if targetIsLeft {
+			return 1
+		}
+		return -1
+	case "right":
+		if targetIsLeft {
+			return -1
+		}
+		return 1
+	case "both_good":
+		return 0.35
+	case "both_bad":
+		return 0
+	default:
+		return 0
+	}
+}
+
+func peerVoteSourceID(row peerVoteFileRow) string {
+	if id := strings.TrimSpace(row.ID); id != "" {
+		return id
+	}
+	queryID := strings.TrimSpace(row.QueryID)
+	if queryID == "" {
+		queryID = strings.TrimSpace(row.QuestionID)
+	}
+	return strings.Join([]string{
+		strings.TrimSpace(row.RunID),
+		strings.TrimSpace(row.Domain),
+		queryID,
+		strings.TrimSpace(row.JudgeModel),
+		strings.TrimSpace(row.LeftModel),
+		strings.TrimSpace(row.RightModel),
+		strconv.FormatInt(row.Seed, 10),
+	}, ":")
+}
+
+func loadPeerVoteTasks(root string) (map[string]peerVoteFileRow, error) {
+	path := filepath.Join(root, "peer_vote_tasks.jsonl")
+	content, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return map[string]peerVoteFileRow{}, nil
+		}
+		return nil, err
+	}
+	out := map[string]peerVoteFileRow{}
+	for lineNo, line := range strings.Split(string(content), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		var row peerVoteFileRow
+		if err := json.Unmarshal([]byte(line), &row); err != nil {
+			return nil, fmt.Errorf("%s:%d: %w", path, lineNo+1, err)
+		}
+		if id := strings.TrimSpace(row.ID); id != "" {
+			out[id] = row
+		}
+	}
+	return out, nil
+}
+
+func mergePeerVoteTask(row peerVoteFileRow, task peerVoteFileRow) peerVoteFileRow {
+	if row.SchemaVersion == 0 {
+		row.SchemaVersion = task.SchemaVersion
+	}
+	if strings.TrimSpace(row.RunID) == "" {
+		row.RunID = task.RunID
+	}
+	if strings.TrimSpace(row.Domain) == "" {
+		row.Domain = task.Domain
+	}
+	if strings.TrimSpace(row.QueryID) == "" {
+		row.QueryID = task.QueryID
+	}
+	if strings.TrimSpace(row.QuestionID) == "" {
+		row.QuestionID = task.QuestionID
+	}
+	if strings.TrimSpace(row.JudgeModel) == "" {
+		row.JudgeModel = task.JudgeModel
+	}
+	if strings.TrimSpace(row.LeftModel) == "" {
+		row.LeftModel = task.LeftModel
+	}
+	if strings.TrimSpace(row.RightModel) == "" {
+		row.RightModel = task.RightModel
+	}
+	if strings.TrimSpace(row.Left.ModelID) == "" {
+		row.Left = task.Left
+	}
+	if strings.TrimSpace(row.Right.ModelID) == "" {
+		row.Right = task.Right
+	}
+	if row.Seed == 0 {
+		row.Seed = task.Seed
+	}
+	return row
+}
+
+func findQuestionByDomainQuery(db *gorm.DB, cat EvalCategory, domain evalDomainMeta, queryID string) (Question, error) {
+	for _, raw := range domain.RawQueries {
+		if raw.ID != queryID {
+			continue
+		}
+		var q Question
+		if err := db.First(&q, "category_id = ? AND prompt = ?", cat.ID, raw.Query).Error; err != nil {
+			return Question{}, err
+		}
+		return q, nil
+	}
+	return Question{}, fmt.Errorf("query %s not found in domain %s", queryID, domain.Slug)
+}
+
+func findModelAnswerID(db *gorm.DB, questionID, modelID string) string {
+	var answer ModelAnswer
+	if err := db.First(&answer, "question_id = ? AND model_id = ?", questionID, modelID).Error; err != nil {
+		return ""
+	}
+	return answer.ID
+}
+
+func syncModelPeerVotes(db *gorm.DB, domains []evalDomainMeta) error {
+	root := modelPeerEvalRoot()
+	path := filepath.Join(root, "peer_votes.jsonl")
+	content, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	taskRows, err := loadPeerVoteTasks(root)
+	if err != nil {
+		return err
+	}
+	domainBySlug := map[string]evalDomainMeta{}
+	for _, domain := range domains {
+		domainBySlug[domain.Slug] = domain
+	}
+	var models []Model
+	if err := db.Where("enabled = ?", true).Find(&models).Error; err != nil {
+		return err
+	}
+	modelByName := map[string]Model{}
+	for _, model := range models {
+		modelByName[strings.TrimSpace(model.Name)] = model
+		modelByName[strings.TrimSpace(model.ID)] = model
+	}
+
+	for lineNo, line := range strings.Split(string(content), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		var row peerVoteFileRow
+		if err := json.Unmarshal([]byte(line), &row); err != nil {
+			return fmt.Errorf("%s:%d: %w", path, lineNo+1, err)
+		}
+		if task, ok := taskRows[strings.TrimSpace(row.ID)]; ok {
+			row = mergePeerVoteTask(row, task)
+		}
+		outcome, err := parseEvalVoteOutcome(row.Outcome, "")
+		if err != nil {
+			return fmt.Errorf("%s:%d: %w", path, lineNo+1, err)
+		}
+		if row.Score == nil {
+			return fmt.Errorf("%s:%d: missing score", path, lineNo+1)
+		}
+		if row.Confidence == nil {
+			return fmt.Errorf("%s:%d: missing confidence", path, lineNo+1)
+		}
+		domainSlug := strings.TrimSpace(row.Domain)
+		domain, ok := domainBySlug[domainSlug]
+		if !ok {
+			return fmt.Errorf("%s:%d: unknown domain %s", path, lineNo+1, domainSlug)
+		}
+		cat, err := findCategoryForDomain(db, domainSlug)
+		if err != nil {
+			return fmt.Errorf("%s:%d: category not found for domain %s: %w", path, lineNo+1, domainSlug, err)
+		}
+		queryID := strings.TrimSpace(row.QueryID)
+		if queryID == "" {
+			queryID = strings.TrimSpace(row.QuestionID)
+		}
+		question, err := findQuestionByDomainQuery(db, cat, domain, queryID)
+		if err != nil {
+			return fmt.Errorf("%s:%d: %w", path, lineNo+1, err)
+		}
+		leftModelKey := strings.TrimSpace(row.LeftModel)
+		if leftModelKey == "" {
+			leftModelKey = strings.TrimSpace(row.Left.ModelID)
+		}
+		rightModelKey := strings.TrimSpace(row.RightModel)
+		if rightModelKey == "" {
+			rightModelKey = strings.TrimSpace(row.Right.ModelID)
+		}
+		judgeModel, ok := modelByName[strings.TrimSpace(row.JudgeModel)]
+		if !ok {
+			return fmt.Errorf("%s:%d: unknown judge model %s", path, lineNo+1, row.JudgeModel)
+		}
+		leftModel, ok := modelByName[leftModelKey]
+		if !ok {
+			return fmt.Errorf("%s:%d: unknown left model %s", path, lineNo+1, leftModelKey)
+		}
+		rightModel, ok := modelByName[rightModelKey]
+		if !ok {
+			return fmt.Errorf("%s:%d: unknown right model %s", path, lineNo+1, rightModelKey)
+		}
+		if leftModel.ID == rightModel.ID {
+			return fmt.Errorf("%s:%d: left and right model must differ", path, lineNo+1)
+		}
+		score := *row.Score
+		sourceID := peerVoteSourceID(row)
+		if strings.TrimSpace(sourceID) == "" {
+			return fmt.Errorf("%s:%d: missing peer vote id", path, lineNo+1)
+		}
+		vote := ModelPeerVote{
+			ID:            newID(),
+			SourceID:      sourceID,
+			RunID:         strings.TrimSpace(row.RunID),
+			Domain:        domainSlug,
+			CategoryID:    cat.ID,
+			QueryID:       queryID,
+			QuestionID:    question.ID,
+			JudgeModelID:  judgeModel.ID,
+			LeftModelID:   leftModel.ID,
+			RightModelID:  rightModel.ID,
+			LeftAnswerID:  findModelAnswerID(db, question.ID, leftModel.ID),
+			RightAnswerID: findModelAnswerID(db, question.ID, rightModel.ID),
+			Outcome:       outcome,
+			Score:         score,
+			Confidence:    *row.Confidence,
+			Reason:        strings.TrimSpace(row.Reason),
+			Seed:          row.Seed,
+			Source:        "model-peer-evals",
+			CreatedAt:     time.Now(),
+		}
+		var existing ModelPeerVote
+		err = db.First(&existing, "source_id = ?", sourceID).Error
+		if err == nil {
+			if existing.Applied {
+				continue
+			}
+			vote.ID = existing.ID
+			vote.Applied = existing.Applied
+			vote.EffectJSON = existing.EffectJSON
+			if err := db.Model(&ModelPeerVote{}).Where("id = ?", existing.ID).Updates(vote).Error; err != nil {
+				return err
+			}
+		} else if errors.Is(err, gorm.ErrRecordNotFound) {
+			if err := db.Create(&vote).Error; err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+		if err := applyModelPeerVote(db, vote.ID); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (a *App) listCategories(c *gin.Context) {
 	var cats []EvalCategory
 	a.db.Where("enabled = ?", true).Order("sort_order asc").Find(&cats)
+	domainBySlug := map[string]evalDomainMeta{}
+	for _, domain := range loadEvalDomainMetas() {
+		domainBySlug[domain.Slug] = domain
+	}
 	out := make([]EvalCategory, 0, len(cats))
 	for i := range cats {
 		slug := domainSlugForCategory(cats[i])
 		cats[i].DomainSlug = slug
+		if domain, ok := domainBySlug[slug]; ok {
+			if strings.TrimSpace(domain.Name) != "" {
+				cats[i].Name = domain.Name
+			}
+			if strings.TrimSpace(domain.Description) != "" {
+				cats[i].Description = domain.Description
+			}
+		}
 		cats[i].SystemPromptMD = readEvalDomainPrompt(slug)
 		if strings.TrimSpace(cats[i].SystemPromptMD) != "" {
 			out = append(out, cats[i])
@@ -1130,6 +1602,10 @@ func eloKDraw(outcome string) float64 {
 	return 28
 }
 
+func peerEloKWin() float64 { return 16 }
+
+func peerEloKDraw() float64 { return 8 }
+
 func modelRank(tx *gorm.DB, modelID, categoryID string) (int, error) {
 	stat := getStat(tx, modelID, categoryID)
 	var better int64
@@ -1274,8 +1750,17 @@ func (a *App) updateEloWin(tx *gorm.DB, questionID, winnerAnswerID, loserAnswerI
 	if err := tx.First(&loserAnswer, "id = ?", loserAnswerID).Error; err != nil {
 		return err
 	}
-	winnerStat := getStat(tx, winnerAnswer.ModelID, question.CategoryID)
-	loserStat := getStat(tx, loserAnswer.ModelID, question.CategoryID)
+	return updateEloWinByModels(tx, question.CategoryID, winnerAnswer.ModelID, loserAnswer.ModelID, k)
+}
+
+func (a *App) updateElo(tx *gorm.DB, questionID, winnerAnswerID, loserAnswerID string, confidence int) error {
+	k := 24 + float64(confidence)*4
+	return a.updateEloWin(tx, questionID, winnerAnswerID, loserAnswerID, k)
+}
+
+func updateEloWinByModels(tx *gorm.DB, categoryID, winnerModelID, loserModelID string, k float64) error {
+	winnerStat := getStat(tx, winnerModelID, categoryID)
+	loserStat := getStat(tx, loserModelID, categoryID)
 	expectedWinner := 1 / (1 + math.Pow(10, (loserStat.EloRating-winnerStat.EloRating)/400))
 	delta := k * (1 - expectedWinner)
 	winnerStat.EloRating += delta
@@ -1307,8 +1792,12 @@ func (a *App) updateEloDraw(tx *gorm.DB, questionID, leftAnswerID, rightAnswerID
 	if err := tx.First(&rightAnswer, "id = ?", rightAnswerID).Error; err != nil {
 		return err
 	}
-	leftStat := getStat(tx, leftAnswer.ModelID, question.CategoryID)
-	rightStat := getStat(tx, rightAnswer.ModelID, question.CategoryID)
+	return updateEloDrawByModels(tx, question.CategoryID, leftAnswer.ModelID, rightAnswer.ModelID, k)
+}
+
+func updateEloDrawByModels(tx *gorm.DB, categoryID, leftModelID, rightModelID string, k float64) error {
+	leftStat := getStat(tx, leftModelID, categoryID)
+	rightStat := getStat(tx, rightModelID, categoryID)
 	// 左方期望得分 E_left（对右）
 	eLeft := 1 / (1 + math.Pow(10, (rightStat.EloRating-leftStat.EloRating)/400))
 	deltaLeft := k * (0.5 - eLeft)
@@ -1339,6 +1828,59 @@ func getStat(tx *gorm.DB, modelID, categoryID string) ModelStat {
 		tx.Create(&stat)
 	}
 	return stat
+}
+
+func applyModelPeerVote(db *gorm.DB, voteID string) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		var vote ModelPeerVote
+		if err := tx.First(&vote, "id = ?", voteID).Error; err != nil {
+			return err
+		}
+		if vote.Applied {
+			return nil
+		}
+		leftEffect, err := modelEffectSnapshot(tx, "left", vote.LeftModelID, vote.CategoryID)
+		if err != nil {
+			return err
+		}
+		rightEffect, err := modelEffectSnapshot(tx, "right", vote.RightModelID, vote.CategoryID)
+		if err != nil {
+			return err
+		}
+		switch vote.Outcome {
+		case "left":
+			err = updateEloWinByModels(tx, vote.CategoryID, vote.LeftModelID, vote.RightModelID, peerEloKWin())
+		case "right":
+			err = updateEloWinByModels(tx, vote.CategoryID, vote.RightModelID, vote.LeftModelID, peerEloKWin())
+		case "both_good", "both_bad":
+			err = updateEloDrawByModels(tx, vote.CategoryID, vote.LeftModelID, vote.RightModelID, peerEloKDraw())
+		default:
+			err = fmt.Errorf("unknown peer vote outcome %s", vote.Outcome)
+		}
+		if err != nil {
+			return err
+		}
+		for _, target := range []*voteModelEffect{&leftEffect, &rightEffect} {
+			stat := getStat(tx, target.ModelID, vote.CategoryID)
+			rank, err := modelRank(tx, target.ModelID, vote.CategoryID)
+			if err != nil {
+				return err
+			}
+			target.EloAfter = stat.EloRating
+			target.EloDelta = stat.EloRating - target.EloBefore
+			target.RankAfter = rank
+			target.RankDelta = target.RankBefore - rank
+		}
+		effect := voteEffect{CategoryID: vote.CategoryID, Models: []voteModelEffect{leftEffect, rightEffect}}
+		effectJSON, err := json.Marshal(effect)
+		if err != nil {
+			return err
+		}
+		return tx.Model(&ModelPeerVote{}).Where("id = ?", vote.ID).Updates(map[string]any{
+			"applied":     true,
+			"effect_json": string(effectJSON),
+		}).Error
+	})
 }
 
 func (a *App) rankings(c *gin.Context) {
@@ -1378,17 +1920,173 @@ func (a *App) rankings(c *gin.Context) {
 	ok(c, rows)
 }
 
+func (a *App) rankingPeerMatrix(c *gin.Context) {
+	categoryID := c.Query("categoryId")
+	type modelRow struct {
+		ModelID     string `json:"modelId"`
+		DisplayName string `json:"displayName"`
+		Provider    string `json:"provider"`
+	}
+	type cellAgg struct {
+		JudgeModelID  string  `json:"judgeModelId"`
+		TargetModelID string  `json:"targetModelId"`
+		Score         float64 `json:"score"`
+		Samples       int64   `json:"samples"`
+		Positive      int64   `json:"positive"`
+		Negative      int64   `json:"negative"`
+		BothGood      int64   `json:"bothGood"`
+		BothBad       int64   `json:"bothBad"`
+	}
+	type matrixResponse struct {
+		Models      []modelRow `json:"models"`
+		Cells       []cellAgg  `json:"cells"`
+		SampleCount int64      `json:"sampleCount"`
+	}
+
+	var models []Model
+	if err := a.db.Where("enabled = ?", true).Order("display_name asc").Find(&models).Error; err != nil {
+		fail(c, http.StatusInternalServerError, "读取模型失败")
+		return
+	}
+	outModels := make([]modelRow, 0, len(models))
+	for _, model := range models {
+		outModels = append(outModels, modelRow{ModelID: model.ID, DisplayName: model.DisplayName, Provider: model.Provider})
+	}
+
+	var votes []ModelPeerVote
+	query := a.db.Where("applied = ?", true)
+	if categoryID != "" {
+		query = query.Where("category_id = ?", categoryID)
+	}
+	if err := query.Find(&votes).Error; err != nil {
+		fail(c, http.StatusInternalServerError, "读取模型互评失败")
+		return
+	}
+
+	cells := map[string]*cellAgg{}
+	add := func(judgeID, targetID string, score float64, outcome string) {
+		key := judgeID + ":" + targetID
+		cell := cells[key]
+		if cell == nil {
+			cell = &cellAgg{JudgeModelID: judgeID, TargetModelID: targetID}
+			cells[key] = cell
+		}
+		cell.Score += score
+		cell.Samples++
+		switch outcome {
+		case "left", "right":
+			if score > 0 {
+				cell.Positive++
+			} else if score < 0 {
+				cell.Negative++
+			}
+		case "both_good":
+			cell.BothGood++
+		case "both_bad":
+			cell.BothBad++
+		}
+	}
+	for _, vote := range votes {
+		add(vote.JudgeModelID, vote.LeftModelID, peerTargetScore(vote.Outcome, true), vote.Outcome)
+		add(vote.JudgeModelID, vote.RightModelID, peerTargetScore(vote.Outcome, false), vote.Outcome)
+	}
+	outCells := make([]cellAgg, 0, len(cells))
+	for _, cell := range cells {
+		if cell.Samples > 0 {
+			cell.Score = cell.Score / float64(cell.Samples)
+		}
+		outCells = append(outCells, *cell)
+	}
+	sort.Slice(outCells, func(i, j int) bool {
+		if outCells[i].JudgeModelID == outCells[j].JudgeModelID {
+			return outCells[i].TargetModelID < outCells[j].TargetModelID
+		}
+		return outCells[i].JudgeModelID < outCells[j].JudgeModelID
+	})
+	ok(c, matrixResponse{Models: outModels, Cells: outCells, SampleCount: int64(len(votes))})
+}
+
+func (a *App) cumulativeTrend(model any, days int) ([]dashboardTrendPoint, error) {
+	now := time.Now()
+	start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).AddDate(0, 0, -(days - 1))
+	points := make([]dashboardTrendPoint, 0, days)
+	for i := 0; i < days; i++ {
+		day := start.AddDate(0, 0, i)
+		end := day.Add(24*time.Hour - time.Nanosecond)
+		var count int64
+		if err := a.db.Model(model).Where("created_at <= ?", end).Count(&count).Error; err != nil {
+			return nil, err
+		}
+		points = append(points, dashboardTrendPoint{Date: day.Format("01-02"), Count: count})
+	}
+	return points, nil
+}
+
+func flatTrend(days int, count int64) []dashboardTrendPoint {
+	now := time.Now()
+	start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).AddDate(0, 0, -(days - 1))
+	points := make([]dashboardTrendPoint, 0, days)
+	for i := 0; i < days; i++ {
+		day := start.AddDate(0, 0, i)
+		points = append(points, dashboardTrendPoint{Date: day.Format("01-02"), Count: count})
+	}
+	return points
+}
+
 func (a *App) dashboard(c *gin.Context) {
 	var users, votes, questions, models int64
 	a.db.Model(&User{}).Count(&users)
 	a.db.Model(&EvalVote{}).Count(&votes)
 	a.db.Model(&Question{}).Count(&questions)
 	a.db.Model(&Model{}).Where("enabled = ?", true).Count(&models)
+	userTrend, err := a.cumulativeTrend(&User{}, 14)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "读取用户趋势失败")
+		return
+	}
+	voteTrend, err := a.cumulativeTrend(&EvalVote{}, 14)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "读取投票趋势失败")
+		return
+	}
+	questionTrend, err := a.cumulativeTrend(&Question{}, 14)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "读取题目趋势失败")
+		return
+	}
 	var categories []EvalCategory
 	a.db.Where("enabled = ?", true).Order("sort_order asc").Find(&categories)
+	domainBySlug := map[string]evalDomainMeta{}
+	for _, domain := range loadEvalDomainMetas() {
+		domainBySlug[domain.Slug] = domain
+	}
+	for i := range categories {
+		slug := domainSlugForCategory(categories[i])
+		if domain, ok := domainBySlug[slug]; ok {
+			if strings.TrimSpace(domain.Name) != "" {
+				categories[i].Name = domain.Name
+			}
+			if strings.TrimSpace(domain.Description) != "" {
+				categories[i].Description = domain.Description
+			}
+		}
+	}
 	var top []map[string]any
 	a.db.Raw(`SELECT m.display_name, ms.elo_rating, ms.vote_count FROM model_stats ms JOIN models m ON m.id = ms.model_id ORDER BY ms.elo_rating DESC LIMIT 5`).Scan(&top)
-	ok(c, gin.H{"users": users, "votes": votes, "questions": questions, "models": models, "categories": categories, "topModels": top})
+	ok(c, gin.H{
+		"users":     users,
+		"votes":     votes,
+		"questions": questions,
+		"models":    models,
+		"trends": gin.H{
+			"users":     userTrend,
+			"votes":     voteTrend,
+			"questions": questionTrend,
+			"models":    flatTrend(14, models),
+		},
+		"categories": categories,
+		"topModels":  top,
+	})
 }
 
 type endpointRequest struct {

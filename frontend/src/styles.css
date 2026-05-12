@@ -83,13 +83,13 @@ button:hover {
 
 /* 亮色模式：主按钮不用深绿渐变，避免与浅色背景反差过大 */
 :root[data-theme='light']
-  button:not(.secondary):not(.ghost):not(.profile-trigger):not(.dropdown-item):not(.theme-btn) {
+  button:not(.secondary):not(.ghost):not(.profile-trigger):not(.dropdown-item):not(.theme-btn):not(.ranking-tab):not(.segmented-btn):not(.battle-setup-seg-btn) {
   background: linear-gradient(135deg, #0284c7 0%, #6366f1 100%);
   color: #ffffff;
 }
 
 :root[data-theme='light']
-  button:not(.secondary):not(.ghost):not(.profile-trigger):not(.dropdown-item):not(.theme-btn):hover {
+  button:not(.secondary):not(.ghost):not(.profile-trigger):not(.dropdown-item):not(.theme-btn):not(.ranking-tab):not(.segmented-btn):not(.battle-setup-seg-btn):hover {
   box-shadow: 0 14px 30px rgba(14, 165, 233, 0.22);
 }
 
@@ -360,6 +360,22 @@ textarea {
   font-size: clamp(30px, 6vw, 56px);
   line-height: 0.95;
   letter-spacing: -0.07em;
+}
+
+.hero-quote-line {
+  display: block;
+  max-width: 680px;
+  margin: 0 0 18px;
+  color: color-mix(in srgb, var(--brand-2) 82%, var(--text-primary));
+  font-size: clamp(18px, 2.15vw, 26px);
+  line-height: 1.32;
+  letter-spacing: -0.025em;
+  font-weight: 750;
+}
+
+.hero-title-line {
+  display: block;
+  max-width: 760px;
 }
 
 .hero-card p {
