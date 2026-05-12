@@ -1,1 +1,30 @@
-{"id":"rq-0001","query":"请写一个 800 字左右的短篇开头：一座永远下雨的城市里，主角第一次听见雨在说谎。要求有悬念、画面感和人物动机。","tags":["opening","suspense","atmosphere"],"source":"manual","notes":"示例：后续替换或追加真实小说创作需求。"}
+{"id": "rq-0001", "query": "如何以“我从修仙界摆烂，修炼走火入魔后，穿越回到了我刚毕业那年……”为开头，创作一个轻松幽默的故事？", "tags": ["creative-writing", "fiction"], "source": "kanshan_eval.xlsx:novel-writing-eval", "notes": ""}
+{"id": "rq-0002", "query": "可以以“我从未想过结局会是这样”为开头写一篇文章吗?", "tags": ["creative-writing", "fiction"], "source": "kanshan_eval.xlsx:novel-writing-eval", "notes": ""}
+{"id": "rq-0003", "query": "文笔挑战:以「碎玻璃」「影子」「沉默」为关键词，写一段文字，你会怎么写？", "tags": ["creative-writing", "fiction"], "source": "kanshan_eval.xlsx:novel-writing-eval", "notes": ""}
+{"id": "rq-0004", "query": "如何以以“系统提示：宿主，您是本世界最后一个普通人”开头，写一个故事？", "tags": ["creative-writing", "fiction"], "source": "kanshan_eval.xlsx:novel-writing-eval", "notes": ""}
+{"id": "rq-0005", "query": "以“2077年，人类终于发明了时间机器。但第一个测试员回来时，只带回一句话：\"别启动它。”写一篇小说？", "tags": ["creative-writing", "fiction"], "source": "kanshan_eval.xlsx:novel-writing-eval", "notes": ""}
+{"id": "rq-0006", "query": "以“清风吹散了月光，______”开头，你会怎么接？", "tags": ["creative-writing", "fiction"], "source": "kanshan_eval.xlsx:novel-writing-eval", "notes": ""}
+{"id": "rq-0007", "query": "在修仙小说设定中，如果穿越到修仙世界，你会选择哪种灵根作为自己的天赋？为什么？", "tags": ["creative-writing", "fiction"], "source": "kanshan_eval.xlsx:novel-writing-eval", "notes": ""}
+{"id": "rq-0008", "query": "文笔挑战| 如何以“一场突如其来的大雨，打乱了所有的计划”为开头写一篇小说？", "tags": ["creative-writing", "fiction"], "source": "kanshan_eval.xlsx:novel-writing-eval", "notes": ""}
+{"id": "rq-0009", "query": "可不可以以“我为明天买下一片夕阳”为开头，写一段话？", "tags": ["creative-writing", "fiction"], "source": "kanshan_eval.xlsx:novel-writing-eval", "notes": ""}
+{"id": "rq-0010", "query": "如何用“燕子”、“蒙蒙细雨”、“归来”，写一段话?", "tags": ["creative-writing", "fiction"], "source": "kanshan_eval.xlsx:novel-writing-eval", "notes": ""}
+{"id": "rq-0011", "query": "如何用“我穿越到了西游记，当妖怪”写个故事？", "tags": ["creative-writing", "fiction"], "source": "kanshan_eval.xlsx:novel-writing-eval", "notes": ""}
+{"id": "rq-0012", "query": "如何以“黄粱一梦，一场空。”为开头写一篇故事？", "tags": ["creative-writing", "fiction"], "source": "kanshan_eval.xlsx:novel-writing-eval", "notes": ""}
+{"id": "rq-0013", "query": "请以“我是一个骗子，现在我要开始撒谎了”为开头写一个微小说？", "tags": ["creative-writing", "fiction"], "source": "kanshan_eval.xlsx:novel-writing-eval", "notes": ""}
+{"id": "rq-0014", "query": "如何用“佛前长跪3000年”作为标题写100字创作微小说？", "tags": ["creative-writing", "fiction"], "source": "kanshan_eval.xlsx:novel-writing-eval", "notes": ""}
+{"id": "rq-0015", "query": "请以“‘嘭’的一声”开头写一篇小说，该怎么写呢？", "tags": ["creative-writing", "fiction"], "source": "kanshan_eval.xlsx:novel-writing-eval", "notes": ""}
+{"id": "rq-0016", "query": "以“我来人间一趟”为开头，可以写一篇小短文吗?", "tags": ["creative-writing", "fiction"], "source": "kanshan_eval.xlsx:novel-writing-eval", "notes": ""}
+{"id": "rq-0017", "query": "如何以「你安心了吧，我被关在了地狱」为开头写一篇文？", "tags": ["creative-writing", "fiction"], "source": "kanshan_eval.xlsx:novel-writing-eval", "notes": ""}
+{"id": "rq-0018", "query": "可不可以以“味道”为主题，写一段文字或者故事？", "tags": ["creative-writing", "fiction"], "source": "kanshan_eval.xlsx:novel-writing-eval", "notes": ""}
+{"id": "rq-0019", "query": "如何以“你用着我的身躯  ，杀死了我最爱的人”为开头写文？", "tags": ["creative-writing", "fiction"], "source": "kanshan_eval.xlsx:novel-writing-eval", "notes": ""}
+{"id": "rq-0020", "query": "用“重生”为开头写一篇故事？", "tags": ["creative-writing", "fiction"], "source": "kanshan_eval.xlsx:novel-writing-eval", "notes": ""}
+{"id": "rq-0021", "query": "如何以「你走吧，别再让我见到你」为开头，写一篇小说？", "tags": ["creative-writing", "fiction"], "source": "kanshan_eval.xlsx:novel-writing-eval", "notes": ""}
+{"id": "rq-0022", "query": "如何以“我的满腹经纶却输给了她的回眸一笑”开头写一篇短文？", "tags": ["creative-writing", "fiction"], "source": "kanshan_eval.xlsx:novel-writing-eval", "notes": ""}
+{"id": "rq-0023", "query": "能以“打扰了，或许我的出现就是一个错误”为开头，写一段话或一篇微小说吗？", "tags": ["creative-writing", "fiction"], "source": "kanshan_eval.xlsx:novel-writing-eval", "notes": ""}
+{"id": "rq-0024", "query": "如何以“死到临头，可有什么遗言？”为开头写一个故事？", "tags": ["creative-writing", "fiction"], "source": "kanshan_eval.xlsx:novel-writing-eval", "notes": ""}
+{"id": "rq-0025", "query": "如何用“起风了，这一次我看见了……”写一篇微小说？", "tags": ["creative-writing", "fiction"], "source": "kanshan_eval.xlsx:novel-writing-eval", "notes": ""}
+{"id": "rq-0026", "query": "如何以“这是我第十次逃离自由”开头写一篇短篇小说？", "tags": ["creative-writing", "fiction"], "source": "kanshan_eval.xlsx:novel-writing-eval", "notes": ""}
+{"id": "rq-0027", "query": "如何以“这是我第一百次死在这个雨夜”为开头，写一遍小说？", "tags": ["creative-writing", "fiction"], "source": "kanshan_eval.xlsx:novel-writing-eval", "notes": ""}
+{"id": "rq-0028", "query": "请以“昨天的你很美，今天也是”为开头写一个微小说？", "tags": ["creative-writing", "fiction"], "source": "kanshan_eval.xlsx:novel-writing-eval", "notes": ""}
+{"id": "rq-0029", "query": "如何以「系统设定，本书是虐文，所以我……」为开头写文？", "tags": ["creative-writing", "fiction"], "source": "kanshan_eval.xlsx:novel-writing-eval", "notes": ""}
+{"id": "rq-0030", "query": "如何以“我是上古神兽饕餮，如今沦落到直播卖艺挣口粮……”为开头，写一篇故事？", "tags": ["creative-writing", "fiction"], "source": "kanshan_eval.xlsx:novel-writing-eval", "notes": ""}

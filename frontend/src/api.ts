@@ -2,10 +2,59 @@ import axios from 'axios'
 import { clearTokens, getAccessToken, getRefreshToken, saveTokens } from './auth'
 
 export type ApiEnvelope<T> = { data: T }
-export type Category = { id: string; code: string; name: string; description: string; enabled: boolean; sortOrder: number }
+export type Category = {
+  id: string
+  code: string
+  name: string
+  description: string
+  enabled: boolean
+  sortOrder: number
+  domainSlug?: string
+  systemPromptMd?: string
+}
 export type Question = { id: string; categoryId: string; prompt: string; source: string; difficulty: string; enabled: boolean }
 export type Model = { id: string; provider: string; name: string; displayName: string; version: string; isBaseline: boolean; enabled: boolean }
 export type ModelAnswer = { id: string; questionId: string; modelId: string; answerText: string; metadataJson: string }
+export type UserHistoryItem = {
+  sessionId: string
+  sessionMode: string
+  sessionCreatedAt: string
+  categoryName: string
+  itemId: string
+  position: number
+  questionId: string
+  questionPrompt: string
+  outcome: 'left' | 'right' | 'both_good' | 'both_bad' | ''
+  outcomeLabel: string
+  votedAt: string
+  leftModelId: string
+  leftModelName: string
+  leftAnswerId: string
+  leftAnswerText: string
+  rightModelId: string
+  rightModelName: string
+  rightAnswerId: string
+  rightAnswerText: string
+  winnerModelIds: string[]
+  winnerModels: string[]
+}
+export type UserModelFitRow = {
+  scope: string
+  modelId: string
+  modelName: string
+  appearances: number
+  positive: number
+  rate: number
+  rank: number
+}
+export type UserHistoryResponse = {
+  items: UserHistoryItem[]
+  total: number
+  page: number
+  pageSize: number
+  fitScopes: string[]
+  topModels: UserModelFitRow[]
+}
 
 export const api = axios.create({
   baseURL: '/api/v1',
@@ -134,6 +183,13 @@ export async function exchangeZhihuOAuthTicket(ticket: string) {
 
 export async function loadCategories() {
   const response = await api.get<ApiEnvelope<Category[]>>('/eval/categories')
+  return response.data.data
+}
+
+export async function loadUserHistory(page = 1, pageSize = 10) {
+  const response = await api.get<ApiEnvelope<UserHistoryResponse>>('/user/history', {
+    params: { page, pageSize },
+  })
   return response.data.data
 }
 

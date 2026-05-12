@@ -18,8 +18,10 @@ const props = withDefaults(
      * 用于 Battle 开局卡等窄容器，避免左耳/身体被裁掉。
      */
     noSpriteTrim?: boolean
+    /** 去掉精灵视窗的底色、边框和阴影，仅保留刘看山主体。 */
+    transparentViewport?: boolean
   }>(),
-  { autoCycle: true, size: 'md', showCaption: true, noSpriteTrim: false },
+  { autoCycle: true, size: 'md', showCaption: true, noSpriteTrim: false, transparentViewport: false },
 )
 
 const BASE = '/assets/kanshan_imgs/'
@@ -75,15 +77,29 @@ const effectiveFrame = computed(() => {
   return 0
 })
 
+/** 四视图中间两格素材默认朝左；展示时镜像成朝右。 */
+const shouldMirrorFrame = computed(() => effectiveFrame.value === 1 || effectiveFrame.value === 2)
+
+const frameOffsetX = computed(() => {
+  if (useScarf.value) {
+    if (effectiveFrame.value === 1) return 12
+    if (effectiveFrame.value === 2) return -4
+  }
+  if (effectiveFrame.value === 0) return 16
+  if (effectiveFrame.value === 2) return -12
+  if (effectiveFrame.value === 3) return -16
+  return 0
+})
+
 const imgStyle = computed(() => {
   const { w, h, cell } = spriteMeta.value
   const t = trimPx.value
-  const x = -(effectiveFrame.value * cell + t)
+  const x = -(effectiveFrame.value * cell + t) + frameOffsetX.value
   return {
     width: `${w}px`,
     height: `${h}px`,
     transform: `translate3d(${x}px, 0, 0)`,
-    transition: 'transform 0.38s cubic-bezier(0.33, 1, 0.68, 1)',
+    transition: 'none',
   }
 })
 
@@ -94,10 +110,24 @@ const viewportStyle = computed(() => {
   return {
     width: `${vw}px`,
     height: `${h}px`,
+    ...(shouldMirrorFrame.value
+      ? {
+          transform: 'scaleX(-1)',
+          transformOrigin: 'center center',
+        }
+      : {}),
   }
 })
 
-const rootClass = computed(() => [`kanshan-root`, `kanshan-root--size-${props.size}`, `kanshan-root--${props.scene}`])
+const frameAnimationKey = computed(() => `${spriteMeta.value.file}-${effectiveFrame.value}`)
+const frameClass = computed(() => ['kanshan-frame', { 'kanshan-frame--animated': !prefersReduce.value }])
+
+const rootClass = computed(() => [
+  `kanshan-root`,
+  `kanshan-root--size-${props.size}`,
+  `kanshan-root--${props.scene}`,
+  { 'kanshan-root--transparent-viewport': props.transparentViewport },
+])
 
 function clearBubbleTimer() {
   if (bubbleTimer) {
@@ -175,8 +205,10 @@ onBeforeUnmount(() => {
       :aria-label="scene === 'home' ? '与刘看山互动' : '刘看山给你一句提示'"
       @click="onTap"
     >
-      <div class="kanshan-viewport" :style="viewportStyle">
-        <img class="kanshan-img" :src="spriteUrl" alt="刘看山" draggable="false" :style="imgStyle" />
+      <div :key="frameAnimationKey" :class="frameClass">
+        <div class="kanshan-viewport" :style="viewportStyle">
+          <img class="kanshan-img" :src="spriteUrl" alt="刘看山" draggable="false" :style="imgStyle" />
+        </div>
       </div>
     </button>
     <p v-if="bubbleText" class="kanshan-bubble" role="status">{{ bubbleText }}</p>
@@ -246,7 +278,8 @@ onBeforeUnmount(() => {
   border: 0;
   padding: 0;
   margin: 0;
-  background: transparent;
+  background: transparent !important;
+  box-shadow: none !important;
   cursor: pointer;
   border-radius: 18px;
   transition:
@@ -272,6 +305,14 @@ onBeforeUnmount(() => {
   transform: translateY(-2px);
 }
 
+.kanshan-frame {
+  display: block;
+}
+
+.kanshan-frame--animated {
+  animation: kanshan-frame-fade-reveal 0.34s ease-out;
+}
+
 .kanshan-viewport {
   overflow: hidden;
   border-radius: 16px;
@@ -280,11 +321,32 @@ onBeforeUnmount(() => {
   box-shadow: 0 10px 28px color-mix(in srgb, #000 12%, transparent);
 }
 
+.kanshan-root--transparent-viewport .kanshan-viewport {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
 .kanshan-img {
   display: block;
   max-width: none;
   height: auto;
   pointer-events: none;
+}
+
+@keyframes kanshan-frame-fade-reveal {
+  from {
+    opacity: 0;
+    filter: brightness(1.08) saturate(1.05);
+  }
+  55% {
+    opacity: 0.86;
+    filter: brightness(1.03) saturate(1.02);
+  }
+  to {
+    opacity: 1;
+    filter: brightness(1) saturate(1);
+  }
 }
 
 .kanshan-bubble {

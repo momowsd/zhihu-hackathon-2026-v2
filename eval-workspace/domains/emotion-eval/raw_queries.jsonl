@@ -1,0 +1,16 @@
+{"id": "rq-0001", "query": "女朋友突然说：\n“你现在对我越来越敷衍了。”\n\n请高情商回复。", "tags": ["high-eq", "reply"], "source": "kanshan_eval.xlsx:emotion-eval", "notes": ""}
+{"id": "rq-0002", "query": "你喜欢的人说：\n“我感觉我们更适合做朋友。”\n\n请高情商回复。", "tags": ["high-eq", "reply"], "source": "kanshan_eval.xlsx:emotion-eval", "notes": ""}
+{"id": "rq-0003", "query": "对方连续很久不回消息后突然出现：\n“最近太忙了。”\n\n请高情商回复。", "tags": ["high-eq", "reply"], "source": "kanshan_eval.xlsx:emotion-eval", "notes": ""}
+{"id": "rq-0004", "query": "女朋友问：\n“如果我变丑了你还会喜欢我吗？”\n\n请高情商回复。", "tags": ["high-eq", "reply"], "source": "kanshan_eval.xlsx:emotion-eval", "notes": ""}
+{"id": "rq-0005", "query": "暧昧对象突然说：\n“你是不是对所有人都这么会聊天？”\n\n请高情商回复。", "tags": ["high-eq", "reply"], "source": "kanshan_eval.xlsx:emotion-eval", "notes": ""}
+{"id": "rq-0006", "query": "喜欢的人说：\n“我最近状态不好，不想谈恋爱。”\n\n请高情商回复。", "tags": ["high-eq", "reply"], "source": "kanshan_eval.xlsx:emotion-eval", "notes": ""}
+{"id": "rq-0007", "query": "老板晚上11点发消息：\n“这个方案你再优化一下。”\n\n请高情商回复。", "tags": ["high-eq", "reply"], "source": "kanshan_eval.xlsx:emotion-eval", "notes": ""}
+{"id": "rq-0008", "query": "同事把锅甩给你：\n“这个不是你负责的吗？”\n\n请高情商回复。", "tags": ["high-eq", "reply"], "source": "kanshan_eval.xlsx:emotion-eval", "notes": ""}
+{"id": "rq-0009", "query": "同事阴阳怪气地说：\n“你下班倒是挺准时啊。”\n\n请高情商回复。", "tags": ["high-eq", "reply"], "source": "kanshan_eval.xlsx:emotion-eval", "notes": ""}
+{"id": "rq-0010", "query": "老板问：\n“你最近是不是工作状态不太好？”\n\n请高情商回复。", "tags": ["high-eq", "reply"], "source": "kanshan_eval.xlsx:emotion-eval", "notes": ""}
+{"id": "rq-0011", "query": "朋友放你鸽子后轻描淡写地说：\n“下次一定。”\n\n请高情商回复。", "tags": ["high-eq", "reply"], "source": "kanshan_eval.xlsx:emotion-eval", "notes": ""}
+{"id": "rq-0012", "query": "你发现朋友被另一群人孤立，但他自己还不知道。\n\n你会怎么提醒他？", "tags": ["high-eq", "reply"], "source": "kanshan_eval.xlsx:emotion-eval", "notes": ""}
+{"id": "rq-0013", "query": "一个很努力但能力一般的下属问你：\n“我是不是不适合这份工作？”\n\n请高情商回复。", "tags": ["high-eq", "reply"], "source": "kanshan_eval.xlsx:emotion-eval", "notes": ""}
+{"id": "rq-0014", "query": "父母不理解你的职业选择，并说：\n“我们都是为你好。”\n\n请高情商回复。", "tags": ["high-eq", "reply"], "source": "kanshan_eval.xlsx:emotion-eval", "notes": ""}
+{"id": "rq-0015", "query": "你准备拒绝一个真心喜欢你的人。\n\n请高情商表达。", "tags": ["high-eq", "reply"], "source": "kanshan_eval.xlsx:emotion-eval", "notes": ""}
+{"id": "rq-0016", "query": "一个年纪大一些的人认真向你学习 AI，但他说：\n“是不是我们这种人已经跟不上时代了？”\n\n请高情商回复。", "tags": ["high-eq", "reply"], "source": "kanshan_eval.xlsx:emotion-eval", "notes": ""}

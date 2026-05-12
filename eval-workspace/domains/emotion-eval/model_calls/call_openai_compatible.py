@@ -52,11 +52,24 @@ def extract_answer(payload: Any) -> str:
     return content if isinstance(content, str) else ""
 
 
-def build_messages(model: dict[str, Any], system_prompt: str, user_prompt: str) -> list[dict[str, Any]]:
+def build_messages(
+    model: dict[str, Any],
+    system_prompt: str,
+    user_prompt: str,
+) -> list[dict[str, Any]]:
     messages: list[dict[str, Any]] = []
     if model.get("includeSystemPrompt", True):
         messages.append({"role": "system", "content": system_prompt})
-    messages.append({"role": "user", "content": [{"type": "text", "text": user_prompt}]})
+
+    # 保持与本地已跑通脚本一致：user content 使用 text part 数组。
+    messages.append(
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": user_prompt},
+            ],
+        }
+    )
     return messages
 
 
@@ -70,17 +83,25 @@ def call_model(model: dict[str, Any], messages: list[dict[str, Any]]) -> Any:
         api_key=api_key,
         timeout=float(model.get("timeoutSeconds", 60 * 20)),
     )
-    request_body: dict[str, Any] = {"model": model["model"], "messages": messages}
+    request_body: dict[str, Any] = {
+        "model": model["model"],
+        "messages": messages,
+    }
     if "temperature" in model:
         request_body["temperature"] = model["temperature"]
     if "maxTokens" in model:
         request_body["max_tokens"] = model["maxTokens"]
+
     return client.chat.completions.create(**request_body)
 
 
 def merge_defaults(config: dict[str, Any]) -> list[dict[str, Any]]:
     defaults = config.get("defaults", {})
-    return [{**defaults, **model} for model in config.get("models", [])]
+    models: list[dict[str, Any]] = []
+    for model in config.get("models", []):
+        merged = {**defaults, **model}
+        models.append(merged)
+    return models
 
 
 def main() -> int:
@@ -126,10 +147,11 @@ def main() -> int:
                     raw = call_model(model, messages)
                     record["rawResponse"] = to_jsonable(raw)
                     record["answer"] = extract_answer(raw)
-                except Exception as exc:
+                except Exception as exc:  # Keep batch output auditable even when one call fails.
                     record["error"] = str(exc)
                 output.write(json.dumps(record, ensure_ascii=False) + "\n")
         print(f"Wrote {output_path}")
+
     return 0
 
 

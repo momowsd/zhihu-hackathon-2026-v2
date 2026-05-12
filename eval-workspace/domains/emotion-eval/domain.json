@@ -1,0 +1,13 @@
+{
+  "slug": "emotion-eval",
+  "name": "高情商回复",
+  "description": "评估模型在亲密关系、社交沟通和冲突缓和场景中的共情、边界感、表达分寸与回复质量。",
+  "version": "0.1.0",
+  "owners": [],
+  "tags": [
+    "emotion",
+    "high-eq",
+    "reply"
+  ],
+  "createdAt": "2026-05-12"
+}

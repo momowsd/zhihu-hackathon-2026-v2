@@ -218,17 +218,19 @@ textarea {
 .profile-trigger {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   color: var(--text-primary);
   background: color-mix(in srgb, var(--surface-2) 86%, transparent);
   border: 1px solid var(--border);
-  padding: 6px 10px 6px 6px;
+  padding: 4px 8px 4px 4px;
+  font-size: 13px;
+  line-height: 1;
 }
 
 .profile-avatar,
 .avatar {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;

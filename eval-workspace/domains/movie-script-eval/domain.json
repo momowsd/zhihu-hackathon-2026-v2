@@ -1,0 +1,13 @@
+{
+  "slug": "movie-script-eval",
+  "name": "短剧脚本生成",
+  "description": "评估模型在短剧脚本、大纲、强情节反转、人物冲突和商业短剧节奏上的生成能力。",
+  "version": "0.1.0",
+  "owners": [],
+  "tags": [
+    "screenplay",
+    "short-drama",
+    "plot"
+  ],
+  "createdAt": "2026-05-12"
+}
