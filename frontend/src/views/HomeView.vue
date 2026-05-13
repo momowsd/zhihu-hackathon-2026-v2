@@ -44,6 +44,7 @@ function primaryAction() {
           <div class="hero-actions">
             <button @click="primaryAction">{{ getAccessToken() ? '进入 Dashboard' : '登录开始盲评' }}</button>
             <RouterLink class="link-btn" to="/rankings">查看 Ranking</RouterLink>
+            <RouterLink class="link-btn" to="/about">关于本项目</RouterLink>
           </div>
         </div>
 

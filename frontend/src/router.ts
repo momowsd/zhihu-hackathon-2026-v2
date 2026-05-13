@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { getAccessToken, useAuth } from './auth'
 import LoginView from './views/LoginView.vue'
 import HomeView from './views/HomeView.vue'
+import AboutView from './views/AboutView.vue'
 import DashboardView from './views/DashboardView.vue'
 import BlindEvalView from './views/BlindEvalView.vue'
 import RankingView from './views/RankingView.vue'
@@ -14,6 +15,7 @@ export const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', name: 'home', component: HomeView },
+    { path: '/about', name: 'about', component: AboutView },
     { path: '/login', name: 'login', component: LoginView },
     { path: '/oauth/zhihu/callback', name: 'zhihu-oauth-callback', component: ZhihuOAuthCallbackView },
     { path: '/dashboard', name: 'dashboard', component: DashboardView, meta: { requiresAuth: true } },

@@ -59,7 +59,8 @@ function logout() {
             <span>{{ auth.username.value }}</span>
           </button>
           <div v-if="profileOpen" class="profile-dropdown">
-            <RouterLink to="/user" class="dropdown-item">个人中心</RouterLink>
+            <RouterLink to="/user" class="dropdown-item" @click="profileOpen = false">个人中心</RouterLink>
+            <RouterLink to="/about" class="dropdown-item" @click="profileOpen = false">关于本项目</RouterLink>
             <button class="dropdown-item danger" type="button" @click="logout">退出登录</button>
           </div>
         </div>
