@@ -9,3 +9,6 @@ dist/
 coverage/
 eval-workspace/**/model_calls/models.local.json
 eval-workspace/model-peer-evals/models.local.json
+deploy/ssl/*.pem
+deploy/ssl/*.key
+!deploy/ssl/.gitkeep

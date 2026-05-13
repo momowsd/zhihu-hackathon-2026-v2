@@ -1,0 +1,5 @@
+# 缩小 `docker build -f backend/Dockerfile .` 的构建上下文
+.git
+.cursor
+frontend
+**/.DS_Store

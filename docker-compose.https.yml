@@ -1,0 +1,17 @@
+# 与主文件一起使用，为前端 Nginx 开启 443 并挂载证书：
+#   docker compose -f docker-compose.yml -f docker-compose.https.yml up -d --build
+#
+# 将证书放到仓库根目录 deploy/ssl/（文件名固定）：
+#   fullchain.pem
+#   privkey.pem
+# （Let's Encrypt、阿里云证书服务下载的 Nginx 格式 PEM 均可，按上述文件名放置或做软链接。）
+#
+# 阿里云 ECS 安全组需放行 TCP 443。
+# 生产环境请把 FRONTEND_ORIGIN、ZHIHU_REDIRECT_URI 改为 https://你的域名/...
+
+services:
+  frontend:
+    ports:
+      - "443:443"
+    volumes:
+      - ./deploy/ssl:/etc/nginx/ssl:ro

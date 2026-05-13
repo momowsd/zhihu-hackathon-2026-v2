@@ -93,3 +93,13 @@ docker compose up --build
 ```
 
 Compose 将前端映射到主机 **80** 端口，浏览器访问 **`http://localhost`**（或 **`http://<公网IP>`**）即可，无需写端口；云上请在安全组放行 **TCP 80**。
+
+### HTTPS（可选）
+
+将证书放到仓库根目录 `deploy/ssl/`，文件名固定为 **`fullchain.pem`** 与 **`privkey.pem`**（可用软链接指向阿里云或 Let’s Encrypt 导出的文件）。与覆盖文件一起启动：
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.https.yml up -d --build
+```
+
+安全组需额外放行 **TCP 443**。容器内 Nginx 在检测到上述两个文件后会自动启用 443，并把 **HTTP 重定向到 HTTPS**。请同步把环境变量里的站点地址改为 `https://...`（例如 `FRONTEND_ORIGIN`、`ZHIHU_REDIRECT_URI`）。
