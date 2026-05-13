@@ -145,7 +145,8 @@ func (a *App) zhihuOAuthCallback(c *gin.Context) {
 		a.redirectOAuthError(c, "缺少知乎授权码")
 		return
 	}
-	if !a.verifyZhihuOAuthState(state) {
+	// 知乎部分授权回跳只带 authorization_code，不回传 state（与 OAuth2 理想行为不一致）；有 state 时再校验 CSRF。
+	if state != "" && !a.verifyZhihuOAuthState(state) {
 		a.redirectOAuthError(c, "知乎登录状态校验失败，请重新发起登录")
 		return
 	}
