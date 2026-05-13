@@ -110,11 +110,27 @@ func (a *App) issueTokens(u User) (tokenPair, error) {
 	now := time.Now()
 	accessExp := now.Add(time.Hour)
 	refreshExp := now.Add(7 * 24 * time.Hour)
-	access, err := a.sign(jwt.MapClaims{"sub": u.ID, "username": u.Username, "role": u.Role, "tokenType": "access", "iat": now.Unix(), "exp": accessExp.Unix()})
+	accessClaims := jwt.MapClaims{
+		"sub": u.ID, "username": u.Username, "role": u.Role,
+		"tokenType": "access", "iat": now.Unix(), "exp": accessExp.Unix(),
+	}
+	refreshClaims := jwt.MapClaims{
+		"sub": u.ID, "username": u.Username, "role": u.Role,
+		"tokenType": "refresh", "iat": now.Unix(), "exp": refreshExp.Unix(),
+	}
+	if dn := strings.TrimSpace(u.DisplayName); dn != "" {
+		accessClaims["displayName"] = dn
+		refreshClaims["displayName"] = dn
+	}
+	if av := strings.TrimSpace(u.AvatarURL); av != "" {
+		accessClaims["avatarUrl"] = av
+		refreshClaims["avatarUrl"] = av
+	}
+	access, err := a.sign(accessClaims)
 	if err != nil {
 		return tokenPair{}, err
 	}
-	refresh, err := a.sign(jwt.MapClaims{"sub": u.ID, "username": u.Username, "role": u.Role, "tokenType": "refresh", "iat": now.Unix(), "exp": refreshExp.Unix()})
+	refresh, err := a.sign(refreshClaims)
 	return tokenPair{AccessToken: access, RefreshToken: refresh, ExpiresIn: int64(time.Hour.Seconds())}, err
 }
 

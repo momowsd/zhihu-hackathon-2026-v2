@@ -94,6 +94,8 @@ func getenvInt(key string, fallback int) int {
 type User struct {
 	ID           string     `gorm:"primaryKey;size:36" json:"id"`
 	Username     string     `gorm:"uniqueIndex;size:64;not null" json:"username"`
+	DisplayName  string     `gorm:"size:128" json:"displayName,omitempty"`
+	AvatarURL    string     `gorm:"size:512" json:"avatarUrl,omitempty"`
 	ZhihuUID     *string    `gorm:"size:64" json:"zhihuUid,omitempty"`
 	Role         string     `gorm:"size:32;not null;default:user" json:"role"`
 	Enabled      bool       `gorm:"not null;default:true" json:"enabled"`

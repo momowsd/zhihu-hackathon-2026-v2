@@ -243,6 +243,7 @@ func (a *App) exchangeZhihuAccessToken(ctx context.Context, code string) (string
 type zhihuUserInfo struct {
 	UID         json.Number `json:"uid"`
 	Fullname    string      `json:"fullname"`
+	Name        string      `json:"name"`
 	Gender      string      `json:"gender"`
 	Headline    string      `json:"headline"`
 	Description string      `json:"description"`
@@ -284,14 +285,50 @@ func (a *App) fetchZhihuUser(ctx context.Context, accessToken string) (zhihuUser
 	return parsed, nil
 }
 
+func zhihuDisplayName(zu zhihuUserInfo) string {
+	if n := strings.TrimSpace(zu.Fullname); n != "" {
+		return n
+	}
+	return strings.TrimSpace(zu.Name)
+}
+
+// zhihuAvatarURL 将知乎返回的头像路径拼成可展示的 HTTPS 地址（若已是绝对 URL 则原样返回）。
+func zhihuAvatarURL(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return ""
+	}
+	if strings.HasPrefix(strings.ToLower(path), "http://") || strings.HasPrefix(strings.ToLower(path), "https://") {
+		return path
+	}
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	return "https://pic1.zhimg.com" + path
+}
+
 func (a *App) upsertUserFromZhihu(zu zhihuUserInfo) (User, error) {
 	uid := zu.UID.String()
 	now := time.Now()
 	var u User
 	err := a.db.First(&u, "zhihu_uid = ?", uid).Error
 	if err == nil {
-		u.LastLoginAt = &now
-		return u, a.db.Model(&u).Update("last_login_at", now).Error
+		displayName := zhihuDisplayName(zu)
+		avatarURL := zhihuAvatarURL(zu.AvatarPath)
+		updates := map[string]any{"last_login_at": now}
+		if displayName != "" {
+			updates["display_name"] = displayName
+		}
+		if avatarURL != "" {
+			updates["avatar_url"] = avatarURL
+		}
+		if err := a.db.Model(&User{}).Where("id = ?", u.ID).Updates(updates).Error; err != nil {
+			return User{}, err
+		}
+		if err := a.db.First(&u, "id = ?", u.ID).Error; err != nil {
+			return User{}, err
+		}
+		return u, nil
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return User{}, err
@@ -304,6 +341,8 @@ func (a *App) upsertUserFromZhihu(zu zhihuUserInfo) (User, error) {
 	u = User{
 		ID:           newID(),
 		Username:     a.uniqueOAuthUsername(uid),
+		DisplayName:  zhihuDisplayName(zu),
+		AvatarURL:    zhihuAvatarURL(zu.AvatarPath),
 		ZhihuUID:     &uid,
 		Role:         roleUser,
 		Enabled:      true,

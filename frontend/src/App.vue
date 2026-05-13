@@ -55,8 +55,14 @@ function logout() {
         <RouterLink v-if="!auth.isAuthed.value" to="/login" class="login-link">登录</RouterLink>
         <div v-else class="profile-menu">
           <button class="profile-trigger" type="button" @click="profileOpen = !profileOpen">
-            <span class="profile-avatar">{{ auth.username.value.slice(0, 1).toUpperCase() }}</span>
-            <span>{{ auth.username.value }}</span>
+            <img
+              v-if="auth.avatarUrl.value"
+              :src="auth.avatarUrl.value"
+              alt=""
+              class="profile-avatar profile-avatar--photo"
+            />
+            <span v-else class="profile-avatar">{{ auth.avatarLetter.value }}</span>
+            <span>{{ auth.displayLabel.value }}</span>
           </button>
           <div v-if="profileOpen" class="profile-dropdown">
             <RouterLink to="/user" class="dropdown-item" @click="profileOpen = false">个人中心</RouterLink>
@@ -71,3 +77,15 @@ function logout() {
     </main>
   </div>
 </template>
+
+<style scoped>
+.profile-avatar--photo {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  object-fit: cover;
+  vertical-align: middle;
+  border: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
+}
+</style>

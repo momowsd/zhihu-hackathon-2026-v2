@@ -115,10 +115,17 @@ onMounted(() => {
     </div>
     <div class="card profile-card profile-card--compact">
       <div class="profile-main">
-        <div class="avatar">{{ auth.username.value.slice(0, 1).toUpperCase() || 'U' }}</div>
+        <img
+          v-if="auth.avatarUrl.value"
+          :src="auth.avatarUrl.value"
+          alt=""
+          class="avatar avatar--photo"
+        />
+        <div v-else class="avatar">{{ auth.avatarLetter.value }}</div>
         <div>
-          <div class="muted">用户名</div>
-          <h2>{{ auth.username.value }}</h2>
+          <div class="muted">站内账号</div>
+          <h2>{{ auth.displayLabel.value }}</h2>
+          <p v-if="auth.displayName.value" class="muted">登录名：{{ auth.username.value }}</p>
           <p class="muted">角色：{{ roleLabel }}</p>
         </div>
       </div>
@@ -252,6 +259,21 @@ onMounted(() => {
   align-items: center;
   gap: 14px;
   min-width: 0;
+}
+
+.profile-main .avatar {
+  width: 52px;
+  height: 52px;
+  font-size: 20px;
+}
+
+.profile-main .avatar--photo {
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
 }
 
 .profile-main h2 {

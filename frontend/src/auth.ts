@@ -6,6 +6,8 @@ const authVersion = ref(0)
 
 type Claims = {
   username?: string
+  displayName?: string
+  avatarUrl?: string
   role?: string
   exp?: number
 }
@@ -48,6 +50,30 @@ export function useAuth() {
     username: computed(() => {
       authVersion.value
       return decode(getAccessToken()).username ?? ''
+    }),
+    displayName: computed(() => {
+      authVersion.value
+      return (decode(getAccessToken()).displayName ?? '').trim()
+    }),
+    /** 顶栏/个人中心展示名：知乎昵称优先，否则站内用户名 */
+    displayLabel: computed(() => {
+      authVersion.value
+      const c = decode(getAccessToken())
+      const dn = (c.displayName ?? '').trim()
+      return dn || (c.username ?? '')
+    }),
+    avatarUrl: computed(() => {
+      authVersion.value
+      return (decode(getAccessToken()).avatarUrl ?? '').trim()
+    }),
+    /** 无头像时用于圆形占位首字 */
+    avatarLetter: computed(() => {
+      authVersion.value
+      const label =
+        (decode(getAccessToken()).displayName ?? '').trim() ||
+        (decode(getAccessToken()).username ?? '')
+      const ch = Array.from(label)[0]
+      return ch ? ch.toLocaleUpperCase('zh-CN') : 'U'
     }),
     role: computed(() => {
       authVersion.value
