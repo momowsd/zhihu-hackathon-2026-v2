@@ -10,8 +10,9 @@ services:
       SERVER_ADDRESS: "${SERVER_ADDRESS:-:8080}"
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       DB_DSN: ${DB_DSN:-file:data/app.db?cache=shared&mode=rwc}
-      # 镜像内默认已含领域文件；阿里云可用卷挂载后把该变量指到挂载路径
+      # 镜像内默认已含领域与互评 jsonl；可用卷挂载后把变量指到挂载路径
       EVAL_WORKSPACE_DOMAINS: ${EVAL_WORKSPACE_DOMAINS:-/app/eval-workspace/domains}
+      EVAL_MODEL_PEER_EVALS: ${EVAL_MODEL_PEER_EVALS:-/app/eval-workspace/model-peer-evals}
       OPENAI_TIMEOUT_SECONDS: ${OPENAI_TIMEOUT_SECONDS:-30}
       ZHIHU_APP_ID: ${ZHIHU_APP_ID:-}
       ZHIHU_APP_KEY: ${ZHIHU_APP_KEY:-}

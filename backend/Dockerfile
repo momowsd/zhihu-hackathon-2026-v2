@@ -1,4 +1,4 @@
-# 构建上下文须为仓库根目录（见 docker-compose.yml），以便打入 eval-workspace/domains。
+# 构建上下文须为仓库根目录（见 docker-compose.yml），以便打入 eval-workspace 下领域与模型互评冷启数据。
 FROM docker.m.daocloud.io/library/golang:1.24-alpine AS build
 
 WORKDIR /src
@@ -16,6 +16,8 @@ FROM docker.m.daocloud.io/library/alpine:3.21
 WORKDIR /app
 COPY --from=build /out/server /app/server
 COPY eval-workspace/domains /app/eval-workspace/domains
+COPY eval-workspace/model-peer-evals /app/eval-workspace/model-peer-evals
 ENV EVAL_WORKSPACE_DOMAINS=/app/eval-workspace/domains
+ENV EVAL_MODEL_PEER_EVALS=/app/eval-workspace/model-peer-evals
 EXPOSE 8080
 CMD ["/app/server"]
