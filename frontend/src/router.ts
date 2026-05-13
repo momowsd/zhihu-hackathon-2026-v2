@@ -29,7 +29,7 @@ export const router = createRouter({
 
 router.beforeEach((to) => {
   if (to.meta.requiresAuth && !getAccessToken()) return { name: 'login' }
-  if (to.meta.requiresAdmin && !useAuth().isAdmin.value) return { name: 'dashboard' }
-  if (to.name === 'login' && getAccessToken()) return { name: 'dashboard' }
+  if (to.meta.requiresAdmin && !useAuth().isAdmin.value) return { name: 'home' }
+  if (to.name === 'login' && getAccessToken()) return { name: 'home' }
   return true
 })

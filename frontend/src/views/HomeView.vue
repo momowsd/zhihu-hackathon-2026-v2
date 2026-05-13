@@ -19,8 +19,12 @@ function toggleHeroSound() {
   void v.play().catch(() => {})
 }
 
-function primaryAction() {
-  router.push(getAccessToken() ? '/dashboard' : '/login')
+function startBattle() {
+  router.push(getAccessToken() ? '/eval' : '/login')
+}
+
+function goDashboard() {
+  router.push('/dashboard')
 }
 </script>
 
@@ -42,8 +46,9 @@ function primaryAction() {
             知乎 IP「刘看山」会在首页与 Battle 里陪你读题、选档。
           </p>
           <div class="hero-actions">
-            <button @click="primaryAction">{{ getAccessToken() ? '进入 Dashboard' : '登录开始盲评' }}</button>
+            <button type="button" @click="startBattle">开始 battle</button>
             <RouterLink class="link-btn" to="/rankings">查看 Ranking</RouterLink>
+            <button v-if="getAccessToken()" type="button" class="ghost" @click="goDashboard">进入 Dashboard</button>
             <RouterLink class="link-btn" to="/about">关于本项目</RouterLink>
           </div>
         </div>

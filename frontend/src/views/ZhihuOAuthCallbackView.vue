@@ -16,7 +16,7 @@ onMounted(async () => {
 
   try {
     await exchangeZhihuOAuthTicket(ticket)
-    router.replace('/dashboard')
+    router.replace('/')
   } catch (err) {
     error.value = errorMessage(err)
   }

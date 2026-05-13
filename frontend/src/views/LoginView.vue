@@ -25,7 +25,7 @@ async function submit() {
   try {
     if (mode.value === 'login') await login(username.value, password.value)
     else await register(username.value, password.value)
-    router.push('/dashboard')
+    router.push('/')
   } catch (err) {
     error.value = errorMessage(err)
   } finally {

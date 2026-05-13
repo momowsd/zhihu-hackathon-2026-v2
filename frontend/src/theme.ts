@@ -16,8 +16,8 @@ export function initTheme(): void {
     applyTheme(saved)
     return
   }
-  const preferredLight = window.matchMedia('(prefers-color-scheme: light)').matches
-  applyTheme(preferredLight ? 'light' : 'dark')
+  // 未在本地选择过主题时固定默认暗色（不跟随系统）
+  applyTheme('dark')
 }
 
 export function toggleTheme(): void {

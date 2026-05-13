@@ -171,12 +171,25 @@ textarea {
   letter-spacing: 0.2px;
 }
 
+/* 雪碧图四视图横排，仅显示第一帧（正面刘看山） */
 .brand-mark {
-  width: 13px;
-  height: 13px;
-  border-radius: 4px;
-  background: linear-gradient(135deg, var(--brand), var(--brand-2));
-  box-shadow: 0 0 24px color-mix(in srgb, var(--brand) 72%, transparent);
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  overflow: hidden;
+  background-color: #0a0a0a;
+  background-image: url('/assets/kanshan_imgs/%E5%88%98%E7%9C%8B%E5%B1%B1%E5%9B%B4%E8%84%96%E5%9B%9B%E8%A7%86%E5%9B%BE.png');
+  background-repeat: no-repeat;
+  background-size: 400% 100%;
+  /* 第一格内人物略偏左上，底图向右下微移以对齐视觉中心 */
+  background-position: 1.5px calc(50% + 2px);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--border) 55%, transparent);
+}
+
+:root[data-theme='light'] .brand-mark {
+  background-color: transparent;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--border) 80%, transparent);
 }
 
 .brand-text {
