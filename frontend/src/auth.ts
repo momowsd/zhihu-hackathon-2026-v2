@@ -12,10 +12,24 @@ type Claims = {
   exp?: number
 }
 
+/** JWT payload 为 Base64URL 编码的 UTF-8 JSON；勿用 atob 直接 JSON.parse，否则会破坏中文等多字节字符。 */
+function jwtPayloadJsonUtf8(segment: string): string {
+  const base64 = segment.replace(/-/g, '+').replace(/_/g, '/')
+  const pad = (4 - (base64.length % 4)) % 4
+  const padded = base64 + '='.repeat(pad)
+  const binary = atob(padded)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+  return new TextDecoder('utf-8').decode(bytes)
+}
+
 function decode(token: string): Claims {
   try {
     const payload = token.split('.')[1]
-    return JSON.parse(atob(payload)) as Claims
+    if (!payload) return {}
+    return JSON.parse(jwtPayloadJsonUtf8(payload)) as Claims
   } catch {
     return {}
   }
