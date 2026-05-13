@@ -68,7 +68,7 @@ npm run dev
 
 默认账号：
 
-- 管理员：`admin` / `admin123`
+- 管理员：`admin` / `********`
 - 普通用户：`demo` / `user123`
 
 ### 知乎 OAuth 登录（可选）
