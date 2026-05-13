@@ -366,10 +366,17 @@ textarea {
   text-transform: uppercase;
 }
 
+/* 首页 hero：eyebrow 与副标句互换字号（其它页 eyebrow 仍 12px） */
+.hero-card .eyebrow {
+  font-size: clamp(18px, 1.15vw, 26px);
+  line-height: 1;
+  margin-bottom: 0;
+}
+
 .hero-card h1 {
   position: relative;
   max-width: 820px;
-  margin: 14px 0 0;
+  margin: 6px 0 0;
   font-size: clamp(30px, 6vw, 56px);
   line-height: 0.95;
   letter-spacing: -0.07em;
@@ -380,8 +387,8 @@ textarea {
   max-width: 680px;
   margin: 0 0 18px;
   color: color-mix(in srgb, var(--brand-2) 82%, var(--text-primary));
-  font-size: clamp(18px, 2.15vw, 26px);
-  line-height: 1.32;
+  font-size: 18px;
+  line-height: 1.05;
   letter-spacing: -0.025em;
   font-weight: 750;
 }

@@ -38,15 +38,15 @@ function goDashboard() {
             <span class="hero-quote-line">
               <span>有问题，就会有答案；有模型，就会有江湖。</span>
             </span>
-            <span class="hero-title-line">和看山队长一起，评出模型的真本事。</span>
+            <span class="hero-title-line">最强模型，由你来定！</span>
           </h1>
           <p>
             这是一个面向 hackathon 的大模型盲评与打榜站点：用户在不知道模型身份的情况下比较回答，
-            系统用 Elo 聚合胜负结果，让“哪个模型更会回答”变成可观察、可讨论、可迭代的数据。
+            系统用 Elo 聚合胜负结果，让“哪个模型更会回答”变成可观察、可讨论、可迭代的数据。 <br>
             知乎 IP「刘看山」会在首页与 Battle 里陪你读题、选档。
           </p>
           <div class="hero-actions">
-            <button type="button" @click="startBattle">开始 battle</button>
+            <button type="button" @click="startBattle">开始 Battle</button>
             <RouterLink class="link-btn" to="/rankings">查看 Ranking</RouterLink>
             <button v-if="getAccessToken()" type="button" class="ghost" @click="goDashboard">进入 Dashboard</button>
             <RouterLink class="link-btn" to="/about">关于本项目</RouterLink>
