@@ -3,8 +3,11 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -22,42 +25,9 @@ import (
 )
 
 const (
-	oauthStateTTL        = 10 * time.Minute
-	oauthTicketTTL       = 2 * time.Minute
-	oauthStateCookieName = "llm_arena_zhihu_oauth_state"
+	oauthStateTTL  = 10 * time.Minute
+	oauthTicketTTL = 2 * time.Minute
 )
-
-type oauthNonceStore struct {
-	mu     sync.Mutex
-	values map[string]time.Time
-}
-
-func newOAuthNonceStore() *oauthNonceStore {
-	return &oauthNonceStore{values: map[string]time.Time{}}
-}
-
-func (s *oauthNonceStore) put(value string, ttl time.Duration) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	now := time.Now()
-	for k, exp := range s.values {
-		if now.After(exp) {
-			delete(s.values, k)
-		}
-	}
-	s.values[value] = now.Add(ttl)
-}
-
-func (s *oauthNonceStore) consume(value string) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	exp, ok := s.values[value]
-	if !ok {
-		return false
-	}
-	delete(s.values, value)
-	return time.Now().Before(exp)
-}
 
 type oauthTicket struct {
 	tokens tokenPair
@@ -98,49 +68,51 @@ func (s *oauthTicketStore) consume(ticket string) (tokenPair, bool) {
 	return entry.tokens, time.Now().Before(entry.exp)
 }
 
-func oauthCookieSecure(c *gin.Context) bool {
-	proto := strings.ToLower(strings.TrimSpace(c.GetHeader("X-Forwarded-Proto")))
-	return proto == "https" || c.Request.TLS != nil
+// issueZhihuOAuthState 生成自校验 state，不依赖进程内存或 Cookie，便于多副本 / 滚动发布。
+func (a *App) issueZhihuOAuthState() (string, error) {
+	if strings.TrimSpace(a.cfg.JWTSecret) == "" {
+		return "", errors.New("JWT_SECRET 未配置")
+	}
+	exp := time.Now().Add(oauthStateTTL).Unix()
+	payload, err := json.Marshal(map[string]any{"exp": exp, "n": randomToken()})
+	if err != nil {
+		return "", err
+	}
+	part := base64.RawURLEncoding.EncodeToString(payload)
+	mac := hmac.New(sha256.New, []byte(a.cfg.JWTSecret))
+	mac.Write([]byte(part))
+	sig := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+	return part + "." + sig, nil
 }
 
-func setOAuthStateCookie(c *gin.Context, state string) {
-	http.SetCookie(c.Writer, &http.Cookie{
-		Name:     oauthStateCookieName,
-		Value:    state,
-		Path:     "/api/v1/auth/zhihu",
-		MaxAge:   int(oauthStateTTL.Seconds()),
-		Expires:  time.Now().Add(oauthStateTTL),
-		HttpOnly: true,
-		Secure:   oauthCookieSecure(c),
-		SameSite: http.SameSiteLaxMode,
-	})
-}
-
-func clearOAuthStateCookie(c *gin.Context) {
-	http.SetCookie(c.Writer, &http.Cookie{
-		Name:     oauthStateCookieName,
-		Value:    "",
-		Path:     "/api/v1/auth/zhihu",
-		MaxAge:   -1,
-		Expires:  time.Unix(0, 0),
-		HttpOnly: true,
-		Secure:   oauthCookieSecure(c),
-		SameSite: http.SameSiteLaxMode,
-	})
-}
-
-func (a *App) validOAuthState(c *gin.Context, state string) bool {
-	if state == "" {
+func (a *App) verifyZhihuOAuthState(state string) bool {
+	if state == "" || strings.TrimSpace(a.cfg.JWTSecret) == "" {
 		return false
 	}
-	if a.oauthStates.consume(state) {
-		return true
+	parts := strings.Split(state, ".")
+	if len(parts) != 2 {
+		return false
 	}
-	cookieState, err := c.Cookie(oauthStateCookieName)
+	part, sigB64 := parts[0], parts[1]
+	mac := hmac.New(sha256.New, []byte(a.cfg.JWTSecret))
+	mac.Write([]byte(part))
+	want := mac.Sum(nil)
+	got, err := base64.RawURLEncoding.DecodeString(sigB64)
+	if err != nil || subtle.ConstantTimeCompare(want, got) != 1 {
+		return false
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(part)
 	if err != nil {
 		return false
 	}
-	return subtle.ConstantTimeCompare([]byte(cookieState), []byte(state)) == 1
+	var p struct {
+		Exp int64  `json:"exp"`
+		N   string `json:"n"`
+	}
+	if err := json.Unmarshal(raw, &p); err != nil || p.N == "" {
+		return false
+	}
+	return p.Exp >= time.Now().Unix()
 }
 
 func (a *App) zhihuOAuthStart(c *gin.Context) {
@@ -149,9 +121,11 @@ func (a *App) zhihuOAuthStart(c *gin.Context) {
 		return
 	}
 
-	state := randomToken()
-	a.oauthStates.put(state, oauthStateTTL)
-	setOAuthStateCookie(c, state)
+	state, err := a.issueZhihuOAuthState()
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "生成登录校验参数失败")
+		return
+	}
 
 	values := url.Values{}
 	values.Set("redirect_uri", a.cfg.ZhihuRedirectURI)
@@ -171,8 +145,7 @@ func (a *App) zhihuOAuthCallback(c *gin.Context) {
 		a.redirectOAuthError(c, "缺少知乎授权码")
 		return
 	}
-	defer clearOAuthStateCookie(c)
-	if !a.validOAuthState(c, state) {
+	if !a.verifyZhihuOAuthState(state) {
 		a.redirectOAuthError(c, "知乎登录状态校验失败，请重新发起登录")
 		return
 	}

@@ -278,7 +278,6 @@ type App struct {
 	db           *gorm.DB
 	cfg          Config
 	client       *http.Client
-	oauthStates  *oauthNonceStore
 	oauthTickets *oauthTicketStore
 }
 
@@ -299,7 +298,6 @@ func main() {
 		db:           db,
 		cfg:          cfg,
 		client:       &http.Client{Timeout: cfg.HTTPTimeout},
-		oauthStates:  newOAuthNonceStore(),
 		oauthTickets: newOAuthTicketStore(),
 	}
 	router := app.router()
