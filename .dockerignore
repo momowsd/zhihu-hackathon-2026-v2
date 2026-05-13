@@ -1,5 +1,4 @@
-# 缩小 `docker build -f backend/Dockerfile .` 的构建上下文
+# 通用忽略规则；不要在这里排除 frontend/，避免阿里云以前端 Dockerfile + 仓库根 context 构建时拿不到前端源码。
 .git
 .cursor
-frontend
 **/.DS_Store
