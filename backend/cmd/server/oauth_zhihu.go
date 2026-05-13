@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -21,8 +22,9 @@ import (
 )
 
 const (
-	oauthStateTTL  = 10 * time.Minute
-	oauthTicketTTL = 2 * time.Minute
+	oauthStateTTL        = 10 * time.Minute
+	oauthTicketTTL       = 2 * time.Minute
+	oauthStateCookieName = "llm_arena_zhihu_oauth_state"
 )
 
 type oauthNonceStore struct {
@@ -96,6 +98,51 @@ func (s *oauthTicketStore) consume(ticket string) (tokenPair, bool) {
 	return entry.tokens, time.Now().Before(entry.exp)
 }
 
+func oauthCookieSecure(c *gin.Context) bool {
+	proto := strings.ToLower(strings.TrimSpace(c.GetHeader("X-Forwarded-Proto")))
+	return proto == "https" || c.Request.TLS != nil
+}
+
+func setOAuthStateCookie(c *gin.Context, state string) {
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     oauthStateCookieName,
+		Value:    state,
+		Path:     "/api/v1/auth/zhihu",
+		MaxAge:   int(oauthStateTTL.Seconds()),
+		Expires:  time.Now().Add(oauthStateTTL),
+		HttpOnly: true,
+		Secure:   oauthCookieSecure(c),
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+func clearOAuthStateCookie(c *gin.Context) {
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     oauthStateCookieName,
+		Value:    "",
+		Path:     "/api/v1/auth/zhihu",
+		MaxAge:   -1,
+		Expires:  time.Unix(0, 0),
+		HttpOnly: true,
+		Secure:   oauthCookieSecure(c),
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+func (a *App) validOAuthState(c *gin.Context, state string) bool {
+	if state == "" {
+		return false
+	}
+	if a.oauthStates.consume(state) {
+		return true
+	}
+	cookieState, err := c.Cookie(oauthStateCookieName)
+	if err != nil {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(cookieState), []byte(state)) == 1
+}
+
 func (a *App) zhihuOAuthStart(c *gin.Context) {
 	if a.cfg.ZhihuAppID == "" || a.cfg.ZhihuAppKey == "" {
 		fail(c, http.StatusServiceUnavailable, "知乎登录未启用，请配置 ZHIHU_APP_ID 和 ZHIHU_APP_KEY")
@@ -104,6 +151,7 @@ func (a *App) zhihuOAuthStart(c *gin.Context) {
 
 	state := randomToken()
 	a.oauthStates.put(state, oauthStateTTL)
+	setOAuthStateCookie(c, state)
 
 	values := url.Values{}
 	values.Set("redirect_uri", a.cfg.ZhihuRedirectURI)
@@ -123,7 +171,8 @@ func (a *App) zhihuOAuthCallback(c *gin.Context) {
 		a.redirectOAuthError(c, "缺少知乎授权码")
 		return
 	}
-	if state == "" || !a.oauthStates.consume(state) {
+	defer clearOAuthStateCookie(c)
+	if !a.validOAuthState(c, state) {
 		a.redirectOAuthError(c, "知乎登录状态校验失败，请重新发起登录")
 		return
 	}
