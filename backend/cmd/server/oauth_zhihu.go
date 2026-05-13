@@ -297,7 +297,7 @@ func (a *App) upsertUserFromZhihu(zu zhihuUserInfo) (User, error) {
 		return User{}, err
 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(randomToken()+randomToken()), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(randomToken()), bcrypt.DefaultCost)
 	if err != nil {
 		return User{}, err
 	}
