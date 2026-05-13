@@ -79,11 +79,11 @@ async function load(page = currentPage.value) {
   error.value = ''
   try {
     const response = await loadUserHistory(page, pageSize)
-    history.value = response.items
+    history.value = response.items ?? []
     total.value = response.total
     currentPage.value = response.page
-    fitScopes.value = response.fitScopes.length ? response.fitScopes : ['全部']
-    topModels.value = response.topModels
+    fitScopes.value = response.fitScopes?.length ? response.fitScopes : ['全部']
+    topModels.value = response.topModels ?? []
     if (!fitScopes.value.includes(activeFitScope.value)) {
       activeFitScope.value = '全部'
     }

@@ -1480,6 +1480,9 @@ func (a *App) userHistory(c *gin.Context) {
 		fail(c, http.StatusInternalServerError, "读取历史评估失败")
 		return
 	}
+	if rows == nil {
+		rows = []userHistoryRow{}
+	}
 	fillHistoryWinners(rows)
 	var allRows []userHistoryRow
 	if err := a.db.Raw(`
@@ -1519,6 +1522,9 @@ func (a *App) userHistory(c *gin.Context) {
 	`, userID).Scan(&allRows).Error; err != nil {
 		fail(c, http.StatusInternalServerError, "读取模型适配统计失败")
 		return
+	}
+	if allRows == nil {
+		allRows = []userHistoryRow{}
 	}
 	fillHistoryWinners(allRows)
 	scopes, topModels := buildUserModelFit(allRows)
